@@ -1,4 +1,7 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:context_menus/context_menus.dart';
@@ -22,8 +25,24 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         textTheme: GoogleFonts.robotoTextTheme(Theme.of(context).textTheme),
       ),
-      home: ContextMenuOverlay(child: const ConnectionListPage()),
+      home: const ConnectionListPage(),
     );
+  }
+}
+
+// from: https://stackoverflow.com/a/71427895
+class AdjustableScrollController extends ScrollController {
+  AdjustableScrollController([int extraScrollSpeed = 40]) {
+    super.addListener(() {
+      ScrollDirection scrollDirection = super.position.userScrollDirection;
+      if (scrollDirection != ScrollDirection.idle) {
+        double scrollEnd = super.offset +
+            (scrollDirection == ScrollDirection.reverse ? extraScrollSpeed : -extraScrollSpeed);
+        scrollEnd =
+            min(super.position.maxScrollExtent, max(super.position.minScrollExtent, scrollEnd));
+        jumpTo(scrollEnd);
+      }
+    });
   }
 }
 
@@ -86,14 +105,14 @@ class ConnectionListPageState extends State<ConnectionListPage> {
       builder: (BuildContext context) {
         return Dialog(
           child: SizedBox(
-            width: 200,
+            width: 400,
             height: 200,
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
                 children: [
                   TextFormField(
-                    decoration: const InputDecoration(hintText: 'URL'),
+                    decoration: const InputDecoration(hintText: 'RPC URL (ends with /rpc/)'),
                     initialValue: conn.url,
                     onChanged: (str) => conn.url = str,
                   ),
@@ -137,50 +156,167 @@ class ConnectionListPageState extends State<ConnectionListPage> {
       future: _loadPrefs,
       builder: ((context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(body: Text('Loading settings...'));
+          return Scaffold(
+            appBar: AppBar(title: const Text('Loading...')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
         }
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Connections'),
+        return ContextMenuOverlay(
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Connections'),
+            ),
+            body: ListView(
+              controller: AdjustableScrollController(100),
+              children: connections
+                  .mapIndexed<Widget>(
+                    (index, conn) => ContextMenuRegion(
+                      enableLongPress: true,
+                      contextMenu: GenericContextMenu(buttonConfigs: [
+                        ContextMenuButtonConfig("Edit", onPressed: () async {
+                          final editedConn = await editConnection(conn);
+                          if (editedConn != null) {
+                            setState(() {
+                              connections[index] = editedConn;
+                              savePrefs();
+                            });
+                          }
+                        }),
+                        ContextMenuButtonConfig("Delete", onPressed: () {
+                          setState(() => connections.remove(conn));
+                        }),
+                      ]),
+                      child: ListTile(
+                        title:
+                            Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => ConnectionPage(conn: conn),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  )
+                  .toList(),
+            ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () async {
+                final conn = await editConnection(ConnectionInfo.empty());
+                if (conn != null) {
+                  setState(() {
+                    connections.add(conn);
+                    savePrefs();
+                  });
+                }
+              },
+              child: const Icon(Icons.add),
+            ),
           ),
-          body: ListView(
-            children: connections
-                .mapIndexed<Widget>(
-                  (index, conn) => ContextMenuRegion(
+        );
+      }),
+    );
+  }
+}
+
+class ConnectionPage extends StatefulWidget {
+  final ConnectionInfo conn;
+  const ConnectionPage({required this.conn, Key? key}) : super(key: key);
+
+  @override
+  State<ConnectionPage> createState() => ConnectionPageState();
+}
+
+class ConnectionPageState extends State<ConnectionPage> {
+  late TransmissionConnection connection;
+  late Future<List<Torrent>> torrents;
+
+  @override
+  void initState() {
+    super.initState();
+    ConnectionInfo ci = widget.conn;
+    connection = TransmissionConnection(ci.url, ci.username, ci.password);
+    torrents = connection.getTorrents();
+  }
+
+  Icon statusIcon(TorrentStatus status) {
+    switch (status) {
+      case TorrentStatus.stopped:
+        return const Icon(Icons.stop, color: Colors.blue);
+      case TorrentStatus.queuedToCheck:
+        return const Icon(Icons.queue); // TODO
+      case TorrentStatus.checking:
+        return const Icon(Icons.watch);
+      case TorrentStatus.queuedToDownload:
+        return const Icon(Icons.queue); // TODO
+      case TorrentStatus.downloading:
+        return const Icon(Icons.arrow_downward, color: Colors.orange);
+      case TorrentStatus.queuedToSeed:
+        return const Icon(Icons.queue); // TODO
+      case TorrentStatus.seeding:
+        return const Icon(Icons.arrow_upward, color: Colors.green);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Torrent>>(
+      future: torrents,
+      builder: ((context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Loading...')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        return ContextMenuOverlay(
+          child: Scaffold(
+            appBar: AppBar(
+              title: const Text('Torrents'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () {
+                    setState(() {
+                      torrents = connection.getTorrents();
+                    });
+                  },
+                )
+              ],
+            ),
+            body: ListView(
+              controller: AdjustableScrollController(100),
+              children: [
+                for (final t in snapshot.data!)
+                  ContextMenuRegion(
                     enableLongPress: true,
                     contextMenu: GenericContextMenu(buttonConfigs: [
-                      ContextMenuButtonConfig("Edit", onPressed: () async {
-                        final editedConn = await editConnection(conn);
-                        if (editedConn != null) {
-                          setState(() {
-                            connections[index] = editedConn;
-                            savePrefs();
-                          });
-                        }
-                      }),
-                      ContextMenuButtonConfig("Delete", onPressed: () {
-                        setState(() => connections.remove(conn));
-                      }),
+                      // TODO: all of these
+                      ContextMenuButtonConfig("Pause", onPressed: () async {}),
+                      ContextMenuButtonConfig("Move", onPressed: () async {}),
+                      ContextMenuButtonConfig("Check", onPressed: () async {}),
+                      ContextMenuButtonConfig("Remove", onPressed: () async {}),
+                      ContextMenuButtonConfig("Remove & Delete data", onPressed: () async {}),
                     ]),
                     child: ListTile(
-                      title: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
-                      onTap: () {},
+                      title: Row(children: [
+                        statusIcon(t.status),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(t.name)),
+                      ]),
+                      onTap: () {}, // TODO
                     ),
                   ),
-                )
-                .toList(),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () async {
-              final conn = await editConnection(ConnectionInfo.empty());
-              if (conn != null) {
-                setState(() {
-                  connections.add(conn);
-                  savePrefs();
-                });
-              }
-            },
-            child: const Icon(Icons.add),
+              ],
+            ),
+            floatingActionButton: FloatingActionButton(
+              onPressed: () async {
+                // TODO: add torrent
+              },
+              child: const Icon(Icons.add),
+            ),
           ),
         );
       }),
