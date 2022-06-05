@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:context_menus/context_menus.dart';
 import 'package:collection/collection.dart';
 import 'dart:convert';
 
-import 'package:transmission_remote/transmission.dart';
+import 'transmission.dart';
+import 'simple_menu.dart';
 
 void main() {
   runApp(const MyApp());
@@ -44,6 +44,32 @@ class AdjustableScrollController extends ScrollController {
       }
     });
   }
+}
+
+Future<bool> youSure(BuildContext context, [String title = 'Are you sure?']) async {
+  bool response = false;
+  await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Text(title),
+          actions: [
+            TextButton(
+                child: const Text('Yes'),
+                onPressed: () {
+                  response = true;
+                  Navigator.of(context).pop();
+                }),
+            TextButton(
+                child: const Text('No'),
+                onPressed: () {
+                  response = false;
+                  Navigator.of(context).pop();
+                }),
+          ],
+        );
+      });
+  return response;
 }
 
 class ConnectionInfo {
@@ -161,19 +187,20 @@ class ConnectionListPageState extends State<ConnectionListPage> {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
-        return ContextMenuOverlay(
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Connections'),
-            ),
-            body: ListView(
-              controller: AdjustableScrollController(100),
-              children: connections
-                  .mapIndexed<Widget>(
-                    (index, conn) => ContextMenuRegion(
-                      enableLongPress: true,
-                      contextMenu: GenericContextMenu(buttonConfigs: [
-                        ContextMenuButtonConfig("Edit", onPressed: () async {
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Connections'),
+          ),
+          body: ListView(
+            controller: AdjustableScrollController(100),
+            children: connections
+                .mapIndexed<Widget>(
+                  (index, conn) => SimpleMenu(
+                    context: context,
+                    items: [
+                      SimpleMenuItem(
+                        child: const Text('Edit'),
+                        onTap: () async {
                           final editedConn = await editConnection(conn);
                           if (editedConn != null) {
                             setState(() {
@@ -181,39 +208,44 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                               savePrefs();
                             });
                           }
-                        }),
-                        ContextMenuButtonConfig("Delete", onPressed: () {
-                          setState(() => connections.remove(conn));
-                        }),
-                      ]),
-                      child: ListTile(
-                        title:
-                            Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (ctx) => ConnectionPage(conn: conn),
-                            ),
-                          );
                         },
                       ),
+                      SimpleMenuItem(
+                        child: const Text('Delete'),
+                        onTap: () async {
+                          if (await youSure(context)) {
+                            setState(() => {connections.remove(conn)});
+                            savePrefs();
+                          }
+                        },
+                      ),
+                    ],
+                    child: ListTile(
+                      title: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (ctx) => ConnectionPage(conn: conn),
+                          ),
+                        );
+                      },
                     ),
-                  )
-                  .toList(),
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () async {
-                final conn = await editConnection(ConnectionInfo.empty());
-                if (conn != null) {
-                  setState(() {
-                    connections.add(conn);
-                    savePrefs();
-                  });
-                }
-              },
-              child: const Icon(Icons.add),
-            ),
+                  ),
+                )
+                .toList(),
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () async {
+              final conn = await editConnection(ConnectionInfo.empty());
+              if (conn != null) {
+                setState(() {
+                  connections.add(conn);
+                  savePrefs();
+                });
+              }
+            },
+            child: const Icon(Icons.add),
           ),
         );
       }),
@@ -280,70 +312,76 @@ class ConnectionPageState extends State<ConnectionPage> {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
-        return ContextMenuOverlay(
-          child: Scaffold(
-            appBar: AppBar(
-              title: const Text('Torrents'),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: () => refreshTorrents(),
-                )
-              ],
-            ),
-            body: ListView(
-              controller: AdjustableScrollController(100),
-              children: [
-                for (final t in snapshot.data!)
-                  ContextMenuRegion(
-                    enableLongPress: true,
-                    contextMenu: GenericContextMenu(buttonConfigs: [
-                      // TODO: all of these
-                      (t.status == TorrentStatus.stopped
-                          ? ContextMenuButtonConfig(
-                              'Start',
-                              onPressed: () async {
-                                await connection.startTorrent(t.id);
-                                refreshTorrents(true);
-                              },
-                            )
-                          : ContextMenuButtonConfig(
-                              'Stop',
-                              onPressed: () async {
-                                await connection.stopTorrent(t.id);
-                                refreshTorrents(true);
-                              },
-                            )),
-                      ContextMenuButtonConfig('Move', onPressed: () async {
-                        // TODO
-                      }),
-                      ContextMenuButtonConfig('Check', onPressed: () async {
-                        // TODO
-                      }),
-                      ContextMenuButtonConfig('Remove', onPressed: () async {
-                        // TODO
-                      }),
-                      ContextMenuButtonConfig('Remove & Delete data', onPressed: () async {
-                        // TODO
-                      }),
+        return Scaffold(
+          appBar: AppBar(
+            title: const Text('Torrents'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh),
+                onPressed: () => refreshTorrents(),
+              )
+            ],
+          ),
+          body: ListView(
+            controller: AdjustableScrollController(100),
+            children: [
+              for (final t in snapshot.data!)
+                SimpleMenu(
+                  context: context,
+                  items: [
+                    // TODO: all of these
+                    (t.status == TorrentStatus.stopped
+                        ? SimpleMenuItem(
+                            child: const Text('Start'),
+                            onTap: () async {
+                              await connection.startTorrent(t.id);
+                              refreshTorrents(true);
+                            },
+                          )
+                        : SimpleMenuItem(
+                            child: const Text('Stop'),
+                            onTap: () async {
+                              await connection.stopTorrent(t.id);
+                              refreshTorrents(true);
+                            },
+                          )),
+                    SimpleMenuItem(
+                        child: const Text('Move'),
+                        onTap: () async {
+                          // TODO
+                        }),
+                    SimpleMenuItem(
+                        child: const Text('Check'),
+                        onTap: () async {
+                          // TODO
+                        }),
+                    SimpleMenuItem(
+                        child: const Text('Remove'),
+                        onTap: () async {
+                          // TODO
+                        }),
+                    SimpleMenuItem(
+                        child: const Text('Remove & Delete data'),
+                        onTap: () async {
+                          // TODO
+                        }),
+                  ],
+                  child: ListTile(
+                    title: Row(children: [
+                      statusIcon(t.status),
+                      const SizedBox(width: 10),
+                      Expanded(child: Text(t.name)),
                     ]),
-                    child: ListTile(
-                      title: Row(children: [
-                        statusIcon(t.status),
-                        const SizedBox(width: 10),
-                        Expanded(child: Text(t.name)),
-                      ]),
-                      onTap: () {}, // TODO
-                    ),
+                    onTap: () {}, // TODO
                   ),
-              ],
-            ),
-            floatingActionButton: FloatingActionButton(
-              onPressed: () async {
-                // TODO: add torrent
-              },
-              child: const Icon(Icons.add),
-            ),
+                ),
+            ],
+          ),
+          floatingActionButton: FloatingActionButton(
+            onPressed: () async {
+              // TODO: add torrent
+            },
+            child: const Icon(Icons.add),
           ),
         );
       }),
