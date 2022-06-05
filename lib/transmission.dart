@@ -20,7 +20,7 @@ class Torrent {
   int id, addedDate;
   TorrentStatus status;
   String name, downloadDir, errorString;
-  int? bytesLeft, seeds, leeches, downSpeed, upSpeed, size;
+  int? size, bytesLeft, seeds, leeches, downSpeed, upSpeed;
   Torrent.fromJson(dynamic json)
       : id = json['id'],
         name = json['name'],
@@ -28,6 +28,7 @@ class Torrent {
         downloadDir = json['downloadDir'],
         errorString = json['errorString'],
         addedDate = json['addedDate'],
+        size = json['sizeWhenDone'],
         bytesLeft = json['leftUntilDone'],
         seeds = json['peersSendingToUs'],
         leeches = json['peersGettingFromUs'],
@@ -114,7 +115,7 @@ class TransmissionConnection {
     await tFetch({
       'method': 'torrent-stop',
       'arguments': {
-        'ids': [id]
+        'ids': [id],
       }
     });
   }
@@ -123,24 +124,47 @@ class TransmissionConnection {
     await tFetch({
       'method': 'torrent-start',
       'arguments': {
-        'ids': [id]
+        'ids': [id],
       }
     });
   }
 
-  Future moveTorrent(int id, String downloadDir) async {
-    // TODO
+  Future moveTorrent(int id, String dir) async {
+    await tFetch({
+      'method': 'torrent-set-location',
+      'arguments': {
+        'ids': [id],
+        'location': dir,
+        'move': true,
+      }
+    });
   }
 
-  Future checkTorrent(int id) async {
-    // TODO
+  Future reannounceTorrent(int id) async {
+    await tFetch({
+      'method': 'torrent-reannounce',
+      'arguments': {
+        'ids': [id],
+      }
+    });
   }
 
-  Future removeTorrent(int id) async {
-    // TODO
+  Future verifyTorrent(int id) async {
+    await tFetch({
+      'method': 'torrent-verify',
+      'arguments': {
+        'ids': [id],
+      }
+    });
   }
 
-  Future removeTorrentWithData(int id) async {
-    // TODO
+  Future removeTorrent(int id, [bool deleteData = false]) async {
+    await tFetch({
+      'method': 'torrent-remove',
+      'arguments': {
+        'ids': [id],
+        'delete-local-data': deleteData,
+      }
+    });
   }
 }

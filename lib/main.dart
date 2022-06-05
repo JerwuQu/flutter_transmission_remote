@@ -72,6 +72,11 @@ Future<bool> youSure(BuildContext context, [String title = 'Are you sure?']) asy
   return response;
 }
 
+String formatBytes(int bytes) {
+  final int i = (log(bytes) / log(1024)).floor();
+  return '${(bytes * 100 / pow(1024, i)).round() / 100} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}';
+}
+
 class ConnectionInfo {
   String url, username, password;
 
@@ -332,52 +337,72 @@ class ConnectionPageState extends State<ConnectionPage> {
               for (final t in snapshot.data!)
                 SimpleMenu(
                   context: context,
-                  items: [
-                    // TODO: all of these
-                    (t.status == TorrentStatus.stopped
-                        ? SimpleMenuItem(
-                            child: const Text('Start'),
+                  items: (t.status == TorrentStatus.stopped
+                          ? [
+                              SimpleMenuItem(
+                                child: const Text('Start'),
+                                onTap: () async {
+                                  await connection.startTorrent(t.id);
+                                  refreshTorrents(true);
+                                },
+                              )
+                            ]
+                          : [
+                              SimpleMenuItem(
+                                child: const Text('Stop'),
+                                onTap: () async {
+                                  await connection.stopTorrent(t.id);
+                                  refreshTorrents(true);
+                                },
+                              )
+                            ]) +
+                      (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
+                          ? [
+                              SimpleMenuItem(
+                                child: const Text('Reannounce'),
+                                onTap: () async {
+                                  await connection.reannounceTorrent(t.id);
+                                },
+                              )
+                            ]
+                          : []) +
+                      [
+                        SimpleMenuItem(
+                            child: const Text('Move'),
                             onTap: () async {
-                              await connection.startTorrent(t.id);
-                              refreshTorrents(true);
-                            },
-                          )
-                        : SimpleMenuItem(
-                            child: const Text('Stop'),
+                              // TODO
+                            }),
+                        SimpleMenuItem(
+                            child: const Text('Verify'),
                             onTap: () async {
-                              await connection.stopTorrent(t.id);
+                              await connection.verifyTorrent(t.id);
                               refreshTorrents(true);
-                            },
-                          )),
-                    SimpleMenuItem(
-                        child: const Text('Move'),
-                        onTap: () async {
-                          // TODO
-                        }),
-                    SimpleMenuItem(
-                        child: const Text('Check'),
-                        onTap: () async {
-                          // TODO
-                        }),
-                    SimpleMenuItem(
-                        child: const Text('Remove'),
-                        onTap: () async {
-                          if (await youSure(context)) {
-                            // TODO
-                          }
-                        }),
-                    SimpleMenuItem(
-                        child: const Text('Remove & Delete data'),
-                        onTap: () async {
-                          if (await youSure(context)) {
-                            // TODO
-                          }
-                        }),
-                  ],
+                            }),
+                        SimpleMenuItem(
+                            child: const Text('Remove'),
+                            onTap: () async {
+                              if (await youSure(context)) {
+                                await connection.removeTorrent(t.id);
+                                refreshTorrents(true);
+                              }
+                            }),
+                        SimpleMenuItem(
+                            child: const Text('Remove & Delete data'),
+                            onTap: () async {
+                              if (await youSure(context)) {
+                                await connection.removeTorrent(t.id, true);
+                                refreshTorrents(true);
+                              }
+                            }),
+                      ],
                   child: ListTile(
                     title: Row(children: [
                       statusIcon(t.status),
                       const SizedBox(width: 10),
+                      /* TODO: show size, progress, eta, date
+                      Text(t.size == null ? '' : formatBytes(t.size!)),
+                      const SizedBox(width: 10),
+                      */
                       Expanded(child: Text(t.name)),
                     ]),
                     onTap: () {}, // TODO
