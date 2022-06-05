@@ -105,4 +105,42 @@ class TransmissionConnection {
     torrents.sort((t1, t2) => t2.addedDate - t1.addedDate);
     return torrents;
   }
+
+  Future addTorrent(String url, String downloadDir) async {
+    // TODO
+  }
+
+  Future stopTorrent(int id) async {
+    await tFetch({
+      'method': 'torrent-stop',
+      'arguments': {
+        'ids': [id]
+      }
+    });
+  }
+
+  Future startTorrent(int id) async {
+    await tFetch({
+      'method': 'torrent-start',
+      'arguments': {
+        'ids': [id]
+      }
+    });
+  }
+
+  Future moveTorrent(int id, String downloadDir) async {
+    // TODO
+  }
+
+  Future checkTorrent(int id) async {
+    // TODO
+  }
+
+  Future removeTorrent(int id) async {
+    // TODO
+  }
+
+  Future removeTorrentWithData(int id) async {
+    // TODO
+  }
 }

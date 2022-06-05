@@ -241,10 +241,19 @@ class ConnectionPageState extends State<ConnectionPage> {
     torrents = connection.getTorrents();
   }
 
+  void refreshTorrents([bool wait = false]) {
+    setState(() {
+      // The wait is to make sure Transmission has a time to process our change before we request the new list
+      torrents = wait
+          ? Future.delayed(const Duration(seconds: 1)).then((value) => connection.getTorrents())
+          : connection.getTorrents();
+    });
+  }
+
   Icon statusIcon(TorrentStatus status) {
     switch (status) {
       case TorrentStatus.stopped:
-        return const Icon(Icons.stop, color: Colors.blue);
+        return const Icon(Icons.pause, color: Colors.blue);
       case TorrentStatus.queuedToCheck:
         return const Icon(Icons.queue); // TODO
       case TorrentStatus.checking:
@@ -278,11 +287,7 @@ class ConnectionPageState extends State<ConnectionPage> {
               actions: [
                 IconButton(
                   icon: const Icon(Icons.refresh),
-                  onPressed: () {
-                    setState(() {
-                      torrents = connection.getTorrents();
-                    });
-                  },
+                  onPressed: () => refreshTorrents(),
                 )
               ],
             ),
@@ -294,11 +299,33 @@ class ConnectionPageState extends State<ConnectionPage> {
                     enableLongPress: true,
                     contextMenu: GenericContextMenu(buttonConfigs: [
                       // TODO: all of these
-                      ContextMenuButtonConfig("Pause", onPressed: () async {}),
-                      ContextMenuButtonConfig("Move", onPressed: () async {}),
-                      ContextMenuButtonConfig("Check", onPressed: () async {}),
-                      ContextMenuButtonConfig("Remove", onPressed: () async {}),
-                      ContextMenuButtonConfig("Remove & Delete data", onPressed: () async {}),
+                      (t.status == TorrentStatus.stopped
+                          ? ContextMenuButtonConfig(
+                              'Start',
+                              onPressed: () async {
+                                await connection.startTorrent(t.id);
+                                refreshTorrents(true);
+                              },
+                            )
+                          : ContextMenuButtonConfig(
+                              'Stop',
+                              onPressed: () async {
+                                await connection.stopTorrent(t.id);
+                                refreshTorrents(true);
+                              },
+                            )),
+                      ContextMenuButtonConfig('Move', onPressed: () async {
+                        // TODO
+                      }),
+                      ContextMenuButtonConfig('Check', onPressed: () async {
+                        // TODO
+                      }),
+                      ContextMenuButtonConfig('Remove', onPressed: () async {
+                        // TODO
+                      }),
+                      ContextMenuButtonConfig('Remove & Delete data', onPressed: () async {
+                        // TODO
+                      }),
                     ]),
                     child: ListTile(
                       title: Row(children: [
