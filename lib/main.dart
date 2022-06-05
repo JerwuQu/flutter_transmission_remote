@@ -121,6 +121,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
     final prefs = await SharedPreferences.getInstance();
     final connectionsJson = jsonEncode(connections.map((c) => c.toJson()).toList());
     await prefs.setString('connections', connectionsJson);
+    // TODO: support storing connections encrypted
   }
 
   Future<ConnectionInfo?> editConnection(ConnectionInfo source) async {
@@ -130,12 +131,12 @@ class ConnectionListPageState extends State<ConnectionListPage> {
       context: context,
       builder: (BuildContext context) {
         return Dialog(
-          child: SizedBox(
-            width: 400,
-            height: 200,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 500),
             child: Padding(
               padding: const EdgeInsets.all(8),
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
                     decoration: const InputDecoration(hintText: 'RPC URL (ends with /rpc/)'),
@@ -151,6 +152,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                     decoration: const InputDecoration(hintText: 'Password (optional)'),
                     initialValue: conn.password,
                     onChanged: (str) => conn.password = str,
+                    obscureText: true,
                   ),
                   const SizedBox(height: 10),
                   TextButton(
