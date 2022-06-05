@@ -214,8 +214,10 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                         child: const Text('Delete'),
                         onTap: () async {
                           if (await youSure(context)) {
-                            setState(() => {connections.remove(conn)});
-                            savePrefs();
+                            setState(() {
+                              connections.remove(conn);
+                              savePrefs();
+                            });
                           }
                         },
                       ),
@@ -358,12 +360,16 @@ class ConnectionPageState extends State<ConnectionPage> {
                     SimpleMenuItem(
                         child: const Text('Remove'),
                         onTap: () async {
-                          // TODO
+                          if (await youSure(context)) {
+                            // TODO
+                          }
                         }),
                     SimpleMenuItem(
                         child: const Text('Remove & Delete data'),
                         onTap: () async {
-                          // TODO
+                          if (await youSure(context)) {
+                            // TODO
+                          }
                         }),
                   ],
                   child: ListTile(
