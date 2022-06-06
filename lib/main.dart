@@ -73,9 +73,14 @@ Future<bool> youSure(BuildContext context, [String title = 'Are you sure?']) asy
 }
 
 String formatBytes(int bytes) {
+  if (bytes <= 0) {
+    return '0 B';
+  }
   final int i = (log(bytes) / log(1024)).floor();
   return '${(bytes * 100 / pow(1024, i)).round() / 100} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}';
 }
+
+String formatOpBytes(int? bytes) => bytes == null ? '?' : formatBytes(bytes);
 
 class ConnectionInfo {
   String url, username, password;
@@ -408,6 +413,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             columns: const [
               DataColumn2(label: Text('Name'), size: ColumnSize.L),
               DataColumn2(label: Text('Size'), size: ColumnSize.S, numeric: true),
+              DataColumn2(label: Text('Up/Down'), size: ColumnSize.S),
             ],
             rows: [
               for (final t in snapshot.data!)
@@ -418,7 +424,9 @@ class ConnectionPageState extends State<ConnectionPage> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(t.name)),
                     ])),
-                    DataCell(Text(t.size == null ? '' : formatBytes(t.size!))),
+                    DataCell(Text(formatOpBytes(t.size))),
+                    DataCell(
+                        Text('${formatOpBytes(t.upSpeed)}/s / ${formatOpBytes(t.downSpeed)}/s')),
                   ],
                   onTap: () {},
                   onSecondaryTapDown: (details) => tapPos = details.globalPosition,
