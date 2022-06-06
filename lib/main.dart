@@ -5,6 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:collection/collection.dart';
+import 'package:data_table_2/data_table_2.dart';
 import 'dart:convert';
 
 import 'transmission.dart';
@@ -271,6 +272,8 @@ class ConnectionPage extends StatefulWidget {
 }
 
 class ConnectionPageState extends State<ConnectionPage> {
+  Offset tapPos = Offset.zero;
+
   late TransmissionConnection connection;
   late Future<List<Torrent>> torrents;
 
@@ -310,6 +313,77 @@ class ConnectionPageState extends State<ConnectionPage> {
     }
   }
 
+  List<SimpleMenuItem> torrentMenu(Torrent t) {
+    return (t.status == TorrentStatus.stopped
+            ? [
+                SimpleMenuItem(
+                  child: const Text('Start'),
+                  onTap: () async {
+                    await connection.startTorrent(t.id);
+                    refreshTorrents(true);
+                  },
+                )
+              ]
+            : [
+                SimpleMenuItem(
+                  child: const Text('Stop'),
+                  onTap: () async {
+                    await connection.stopTorrent(t.id);
+                    refreshTorrents(true);
+                  },
+                )
+              ]) +
+        (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
+            ? [
+                SimpleMenuItem(
+                  child: const Text('Reannounce'),
+                  onTap: () async {
+                    await connection.reannounceTorrent(t.id);
+                  },
+                )
+              ]
+            : []) +
+        [
+          SimpleMenuItem(
+              child: const Text('Move'),
+              onTap: () async {
+                // TODO
+              }),
+          SimpleMenuItem(
+              child: const Text('Verify'),
+              onTap: () async {
+                await connection.verifyTorrent(t.id);
+                refreshTorrents(true);
+              }),
+          SimpleMenuItem(
+              child: const Text('Remove'),
+              onTap: () async {
+                if (await youSure(context)) {
+                  await connection.removeTorrent(t.id);
+                  refreshTorrents(true);
+                }
+              }),
+          SimpleMenuItem(
+              child: const Text('Remove & Delete data'),
+              onTap: () async {
+                if (await youSure(context)) {
+                  await connection.removeTorrent(t.id, true);
+                  refreshTorrents(true);
+                }
+              }),
+        ];
+  }
+
+  void showTorrentMenu(Torrent t) {
+    final size = context.findRenderObject()?.paintBounds.size ?? Size.zero;
+    final rect = RelativeRect.fromRect(tapPos & Size.zero, Offset.zero & size);
+    showMenu(
+      context: context,
+      items: torrentMenu(t),
+      position: rect,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Torrent>>(
@@ -331,82 +405,27 @@ class ConnectionPageState extends State<ConnectionPage> {
               )
             ],
           ),
-          body: ListView(
-            controller: AdjustableScrollController(100),
-            children: [
+          body: DataTable2(
+            scrollController: AdjustableScrollController(100),
+            columns: const [
+              DataColumn2(label: Text('Name'), size: ColumnSize.L),
+              DataColumn2(label: Text('Size'), size: ColumnSize.S, numeric: true),
+            ],
+            rows: [
               for (final t in snapshot.data!)
-                SimpleMenu(
-                  context: context,
-                  items: (t.status == TorrentStatus.stopped
-                          ? [
-                              SimpleMenuItem(
-                                child: const Text('Start'),
-                                onTap: () async {
-                                  await connection.startTorrent(t.id);
-                                  refreshTorrents(true);
-                                },
-                              )
-                            ]
-                          : [
-                              SimpleMenuItem(
-                                child: const Text('Stop'),
-                                onTap: () async {
-                                  await connection.stopTorrent(t.id);
-                                  refreshTorrents(true);
-                                },
-                              )
-                            ]) +
-                      (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
-                          ? [
-                              SimpleMenuItem(
-                                child: const Text('Reannounce'),
-                                onTap: () async {
-                                  await connection.reannounceTorrent(t.id);
-                                },
-                              )
-                            ]
-                          : []) +
-                      [
-                        SimpleMenuItem(
-                            child: const Text('Move'),
-                            onTap: () async {
-                              // TODO
-                            }),
-                        SimpleMenuItem(
-                            child: const Text('Verify'),
-                            onTap: () async {
-                              await connection.verifyTorrent(t.id);
-                              refreshTorrents(true);
-                            }),
-                        SimpleMenuItem(
-                            child: const Text('Remove'),
-                            onTap: () async {
-                              if (await youSure(context)) {
-                                await connection.removeTorrent(t.id);
-                                refreshTorrents(true);
-                              }
-                            }),
-                        SimpleMenuItem(
-                            child: const Text('Remove & Delete data'),
-                            onTap: () async {
-                              if (await youSure(context)) {
-                                await connection.removeTorrent(t.id, true);
-                                refreshTorrents(true);
-                              }
-                            }),
-                      ],
-                  child: ListTile(
-                    title: Row(children: [
+                DataRow2(
+                  cells: [
+                    DataCell(Row(children: [
                       statusIcon(t.status),
                       const SizedBox(width: 10),
-                      /* TODO: show size, progress, eta, date
-                      Text(t.size == null ? '' : formatBytes(t.size!)),
-                      const SizedBox(width: 10),
-                      */
                       Expanded(child: Text(t.name)),
-                    ]),
-                    onTap: () {}, // TODO
-                  ),
+                    ])),
+                    DataCell(Text(t.size == null ? '' : formatBytes(t.size!))),
+                  ],
+                  onTap: () {},
+                  onSecondaryTapDown: (details) => tapPos = details.globalPosition,
+                  // TODO: add onTapDown to data_table_2 and use onTap instead of onSecondaryTap
+                  onSecondaryTap: () => showTorrentMenu(t),
                 ),
             ],
           ),
