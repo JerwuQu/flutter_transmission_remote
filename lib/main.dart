@@ -289,12 +289,18 @@ class ConnectionPageState extends State<ConnectionPage> {
     torrents = connection.getTorrents();
   }
 
-  void refreshTorrents([bool wait = false]) {
+  void refreshTorrents([Future? action]) {
     setState(() {
-      // The wait is to make sure Transmission has a time to process our change before we request the new list
-      torrents = wait
-          ? Future.delayed(const Duration(seconds: 1)).then((value) => connection.getTorrents())
-          : connection.getTorrents();
+      if (action == null) {
+        torrents = connection.getTorrents();
+      } else {
+        torrents = () async {
+          await action;
+          // The wait is to make sure Transmission has a time to process our change before we request the new list
+          await Future.delayed(const Duration(seconds: 1));
+          return await connection.getTorrents();
+        }();
+      }
     });
   }
 
@@ -322,28 +328,20 @@ class ConnectionPageState extends State<ConnectionPage> {
             ? [
                 PopupMenuItem(
                   child: const Text('Start'),
-                  onTap: () async {
-                    await connection.startTorrent(t.id);
-                    refreshTorrents(true);
-                  },
+                  onTap: () => refreshTorrents(connection.startTorrent(t.id)),
                 )
               ]
             : [
                 PopupMenuItem(
                   child: const Text('Stop'),
-                  onTap: () async {
-                    await connection.stopTorrent(t.id);
-                    refreshTorrents(true);
-                  },
+                  onTap: () => refreshTorrents(connection.stopTorrent(t.id)),
                 )
               ]) +
         (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
             ? [
                 PopupMenuItem(
                   child: const Text('Reannounce'),
-                  onTap: () async {
-                    await connection.reannounceTorrent(t.id);
-                  },
+                  onTap: () => connection.reannounceTorrent(t.id),
                 )
               ]
             : []) +
@@ -354,25 +352,21 @@ class ConnectionPageState extends State<ConnectionPage> {
                 // TODO
               }),
           PopupMenuItem(
-              child: const Text('Verify'),
-              onTap: () async {
-                await connection.verifyTorrent(t.id);
-                refreshTorrents(true);
-              }),
+            child: const Text('Verify'),
+            onTap: () => refreshTorrents(connection.verifyTorrent(t.id)),
+          ),
           PopupMenuItem(
               child: const Text('Remove'),
               onTap: () async {
                 if (await youSure(context)) {
-                  await connection.removeTorrent(t.id);
-                  refreshTorrents(true);
+                  refreshTorrents(connection.removeTorrent(t.id));
                 }
               }),
           PopupMenuItem(
               child: const Text('Remove & Delete data'),
               onTap: () async {
                 if (await youSure(context)) {
-                  await connection.removeTorrent(t.id, true);
-                  refreshTorrents(true);
+                  refreshTorrents(connection.removeTorrent(t.id, true));
                 }
               }),
         ];
@@ -448,8 +442,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                   ),
                   onPressed: () async {
                     Navigator.of(context).pop();
-                    await connection.addTorrentByUrl(torrentUrl, downloadDir);
-                    refreshTorrents(true);
+                    refreshTorrents(connection.addTorrentByUrl(torrentUrl, downloadDir));
                   },
                   child: const Text('Add'),
                 ),
