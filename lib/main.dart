@@ -130,9 +130,9 @@ class ConnectionListPageState extends State<ConnectionListPage> {
     // TODO: support storing connections encrypted
   }
 
-  Future<ConnectionInfo?> editConnection(ConnectionInfo source) async {
-    ConnectionInfo conn = ConnectionInfo.copy(source);
-    ConnectionInfo? returnConn;
+  Future editConnection([int? index]) async {
+    ConnectionInfo conn =
+        index == null ? ConnectionInfo.empty() : ConnectionInfo.copy(connections[index]);
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -161,18 +161,53 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                     obscureText: true,
                   ),
                   const SizedBox(height: 10),
-                  TextButton(
-                    style: TextButton.styleFrom(
-                      primary: Theme.of(context).colorScheme.primary,
-                      backgroundColor: Theme.of(context).colorScheme.surface,
-                      elevation: 3,
-                      padding: const EdgeInsets.all(8),
-                    ),
-                    onPressed: () {
-                      returnConn = conn;
-                      return Navigator.of(context).pop();
-                    },
-                    child: const Text('Save'),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              primary: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              elevation: 3,
+                              padding: const EdgeInsets.all(8),
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                if (index == null) {
+                                  connections.add(conn);
+                                } else {
+                                  connections[index] = conn;
+                                }
+                                savePrefs();
+                              });
+                              return Navigator.of(context).pop();
+                            },
+                            child: const Text('Save'),
+                          ),
+                        ] +
+                        (index == null
+                            ? []
+                            : [
+                                const SizedBox(width: 40),
+                                TextButton(
+                                  style: TextButton.styleFrom(
+                                    primary: Colors.red,
+                                    backgroundColor: Theme.of(context).colorScheme.surface,
+                                    elevation: 3,
+                                    padding: const EdgeInsets.all(8),
+                                  ),
+                                  onPressed: () async {
+                                    if (await youSure(context)) {
+                                      setState(() {
+                                        connections.removeAt(index);
+                                        savePrefs();
+                                      });
+                                      Navigator.of(context).pop();
+                                    }
+                                  },
+                                  child: const Text('Delete'),
+                                ),
+                              ]),
                   ),
                 ],
               ),
@@ -181,7 +216,6 @@ class ConnectionListPageState extends State<ConnectionListPage> {
         );
       },
     );
-    return returnConn;
   }
 
   @override
@@ -203,58 +237,23 @@ class ConnectionListPageState extends State<ConnectionListPage> {
             controller: AdjustableScrollController(100),
             children: connections
                 .mapIndexed<Widget>(
-                  (index, conn) => SimpleMenu(
-                    context: context,
-                    items: [
-                      SimpleMenuItem(
-                        child: const Text('Edit'),
-                        onTap: () async {
-                          final editedConn = await editConnection(conn);
-                          if (editedConn != null) {
-                            setState(() {
-                              connections[index] = editedConn;
-                              savePrefs();
-                            });
-                          }
-                        },
-                      ),
-                      SimpleMenuItem(
-                        child: const Text('Delete'),
-                        onTap: () async {
-                          if (await youSure(context)) {
-                            setState(() {
-                              connections.remove(conn);
-                              savePrefs();
-                            });
-                          }
-                        },
-                      ),
-                    ],
-                    child: ListTile(
-                      title: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (ctx) => ConnectionPage(conn: conn),
-                          ),
-                        );
-                      },
-                    ),
+                  (index, conn) => ListTile(
+                    title: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (ctx) => ConnectionPage(conn: conn),
+                        ),
+                      );
+                    },
+                    onLongPress: () => editConnection(index),
                   ),
                 )
                 .toList(),
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () async {
-              final conn = await editConnection(ConnectionInfo.empty());
-              if (conn != null) {
-                setState(() {
-                  connections.add(conn);
-                  savePrefs();
-                });
-              }
-            },
+            onPressed: () => editConnection(),
             child: const Icon(Icons.add),
           ),
         );
