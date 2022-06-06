@@ -107,8 +107,14 @@ class TransmissionConnection {
     return torrents;
   }
 
-  Future addTorrent(String url, String downloadDir) async {
-    // TODO
+  Future addTorrentByUrl(String torrentUrl, String downloadDir) async {
+    await tFetch({
+      'method': 'torrent-add',
+      'arguments': {
+        'filename': torrentUrl,
+        'download-dir': downloadDir,
+      }
+    });
   }
 
   Future stopTorrent(int id) async {

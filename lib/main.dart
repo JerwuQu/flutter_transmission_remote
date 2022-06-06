@@ -149,17 +149,20 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   TextFormField(
-                    decoration: const InputDecoration(hintText: 'RPC URL (ends with /rpc/)'),
+                    decoration: const InputDecoration(
+                      hintText: 'https://example.com/rpc/',
+                      labelText: 'RPC URL (end in /rpc/)',
+                    ),
                     initialValue: conn.url,
                     onChanged: (str) => conn.url = str,
                   ),
                   TextFormField(
-                    decoration: const InputDecoration(hintText: 'Username (optional)'),
+                    decoration: const InputDecoration(labelText: 'Username (optional)'),
                     initialValue: conn.username,
                     onChanged: (str) => conn.username = str,
                   ),
                   TextFormField(
-                    decoration: const InputDecoration(hintText: 'Password (optional)'),
+                    decoration: const InputDecoration(labelText: 'Password (optional)'),
                     initialValue: conn.password,
                     onChanged: (str) => conn.password = str,
                     obscureText: true,
@@ -246,9 +249,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                     onTap: () {
                       Navigator.push(
                         context,
-                        MaterialPageRoute(
-                          builder: (ctx) => ConnectionPage(conn: conn),
-                        ),
+                        MaterialPageRoute(builder: (ctx) => ConnectionPage(conn: conn)),
                       );
                     },
                     onLongPress: () => editConnection(index),
@@ -387,6 +388,79 @@ class ConnectionPageState extends State<ConnectionPage> {
     );
   }
 
+  void addTorrentDialog() async {
+    final torrentList = await torrents;
+    String torrentUrl = '';
+    String downloadDir = torrentList.firstOrNull?.downloadDir ?? '';
+    final downloadDirController = TextEditingController(text: downloadDir);
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  decoration: const InputDecoration(
+                    hintText: 'https://...',
+                    labelText: 'Torrent URL',
+                  ),
+                  onChanged: (str) => torrentUrl = str,
+                ),
+                Row(
+                  children: [
+                    PopupMenuButton(
+                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
+                      tooltip: 'Choose from current torrents',
+                      itemBuilder: (BuildContext context) {
+                        return torrentList
+                            .map((t) => t.downloadDir)
+                            .toSet()
+                            .map((d) => PopupMenuItem(value: d, child: Text(d)))
+                            .toList();
+                      },
+                      onSelected: (str) {
+                        downloadDir = str as String;
+                        downloadDirController.text = downloadDir;
+                      },
+                    ),
+                    Expanded(
+                      child: TextFormField(
+                        controller: downloadDirController,
+                        decoration: const InputDecoration(
+                          hintText: '~/Download',
+                          labelText: 'Download directory',
+                        ),
+                        onChanged: (str) => downloadDir = str,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                TextButton(
+                  style: TextButton.styleFrom(
+                    primary: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    elevation: 3,
+                    padding: const EdgeInsets.all(8),
+                  ),
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await connection.addTorrentByUrl(torrentUrl, downloadDir);
+                    refreshTorrents(true);
+                  },
+                  child: const Text('Add'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Torrent>>(
@@ -424,7 +498,9 @@ class ConnectionPageState extends State<ConnectionPage> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(t.name)),
                     ])),
-                    DataCell(Text(formatOpBytes(t.size))),
+                    DataCell(Text(t.bytesLeft == null || t.size == null || t.bytesLeft == 0
+                        ? formatOpBytes(t.size)
+                        : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}')),
                     DataCell(
                         Text('${formatOpBytes(t.upSpeed)}/s / ${formatOpBytes(t.downSpeed)}/s')),
                   ],
@@ -437,7 +513,7 @@ class ConnectionPageState extends State<ConnectionPage> {
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: () async {
-              // TODO: add torrent
+              addTorrentDialog();
             },
             child: const Icon(Icons.add),
           ),
