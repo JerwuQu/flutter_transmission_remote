@@ -9,7 +9,6 @@ import 'package:data_table_2/data_table_2.dart';
 import 'dart:convert';
 
 import 'transmission.dart';
-import 'simple_menu.dart';
 
 void main() {
   runApp(const MyApp());
@@ -312,10 +311,10 @@ class ConnectionPageState extends State<ConnectionPage> {
     }
   }
 
-  List<SimpleMenuItem> torrentMenu(Torrent t) {
+  List<PopupMenuItem> torrentMenu(Torrent t) {
     return (t.status == TorrentStatus.stopped
             ? [
-                SimpleMenuItem(
+                PopupMenuItem(
                   child: const Text('Start'),
                   onTap: () async {
                     await connection.startTorrent(t.id);
@@ -324,7 +323,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                 )
               ]
             : [
-                SimpleMenuItem(
+                PopupMenuItem(
                   child: const Text('Stop'),
                   onTap: () async {
                     await connection.stopTorrent(t.id);
@@ -334,7 +333,7 @@ class ConnectionPageState extends State<ConnectionPage> {
               ]) +
         (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
             ? [
-                SimpleMenuItem(
+                PopupMenuItem(
                   child: const Text('Reannounce'),
                   onTap: () async {
                     await connection.reannounceTorrent(t.id);
@@ -343,18 +342,18 @@ class ConnectionPageState extends State<ConnectionPage> {
               ]
             : []) +
         [
-          SimpleMenuItem(
+          PopupMenuItem(
               child: const Text('Move'),
               onTap: () async {
                 // TODO
               }),
-          SimpleMenuItem(
+          PopupMenuItem(
               child: const Text('Verify'),
               onTap: () async {
                 await connection.verifyTorrent(t.id);
                 refreshTorrents(true);
               }),
-          SimpleMenuItem(
+          PopupMenuItem(
               child: const Text('Remove'),
               onTap: () async {
                 if (await youSure(context)) {
@@ -362,7 +361,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                   refreshTorrents(true);
                 }
               }),
-          SimpleMenuItem(
+          PopupMenuItem(
               child: const Text('Remove & Delete data'),
               onTap: () async {
                 if (await youSure(context)) {
