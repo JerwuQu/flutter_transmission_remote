@@ -502,6 +502,11 @@ class ConnectionPageState extends State<ConnectionPage> {
     });
   }
 
+  String dateString(int secs) {
+    final iso = DateTime.fromMillisecondsSinceEpoch(secs * 1000).toLocal().toIso8601String();
+    return iso.substring(0, iso.indexOf('.')).replaceFirst('T', '\n');
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -537,6 +542,11 @@ class ConnectionPageState extends State<ConnectionPage> {
                 onSort: (col, asc) => _sort((t) => t.name, col, asc),
               ),
               DataColumn2(
+                label: const Text('Date Added'),
+                size: ColumnSize.S,
+                onSort: (col, asc) => _sort<num>((t) => t.addedDate, col, asc),
+              ),
+              DataColumn2(
                 label: const Text('Size'),
                 size: ColumnSize.S,
                 numeric: true,
@@ -564,6 +574,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(t.name)),
                     ])),
+                    DataCell(Text(dateString(t.addedDate), textAlign: TextAlign.center)),
                     DataCell(Text(
                       t.bytesLeft == null || t.size == null || t.bytesLeft == 0
                           ? formatOpBytes(t.size)
