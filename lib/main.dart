@@ -484,6 +484,24 @@ class ConnectionPageState extends State<ConnectionPage> {
     );
   }
 
+  int? _sortColumnIndex;
+  bool _sortAscending = true;
+  void _sort<T extends Comparable<T>>(
+    T Function(Torrent) getField,
+    int columnIndex,
+    bool ascending,
+  ) {
+    setState(() {
+      if (ascending) {
+        mergeSort(torrents, compare: (Torrent a, Torrent b) => getField(a).compareTo(getField(b)));
+      } else {
+        mergeSort(torrents, compare: (Torrent a, Torrent b) => getField(b).compareTo(getField(a)));
+      }
+      _sortColumnIndex = columnIndex;
+      _sortAscending = ascending;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -510,11 +528,32 @@ class ConnectionPageState extends State<ConnectionPage> {
             smRatio: 0.4,
             columnSpacing: 5,
             scrollController: AdjustableScrollController(100), // TODO: keep offset after refresh
-            columns: const [
-              DataColumn2(label: Text('Name'), size: ColumnSize.L),
-              DataColumn2(label: Text('Size'), size: ColumnSize.S, numeric: true),
-              DataColumn2(label: Text('Up'), size: ColumnSize.S, numeric: true),
-              DataColumn2(label: Text('Down'), size: ColumnSize.S, numeric: true),
+            sortAscending: _sortAscending,
+            sortColumnIndex: _sortColumnIndex,
+            columns: [
+              DataColumn2(
+                label: const Text('Name'),
+                size: ColumnSize.L,
+                onSort: (col, asc) => _sort((t) => t.name, col, asc),
+              ),
+              DataColumn2(
+                label: const Text('Size'),
+                size: ColumnSize.S,
+                numeric: true,
+                onSort: (col, asc) => _sort<num>((t) => t.size ?? 0, col, asc),
+              ),
+              DataColumn2(
+                label: const Text('Up'),
+                size: ColumnSize.S,
+                numeric: true,
+                onSort: (col, asc) => _sort<num>((t) => t.upSpeed ?? 0, col, asc),
+              ),
+              DataColumn2(
+                label: const Text('Down'),
+                size: ColumnSize.S,
+                numeric: true,
+                onSort: (col, asc) => _sort<num>((t) => t.downSpeed ?? 0, col, asc),
+              ),
             ],
             rows: [
               for (final t in torrents)
@@ -542,7 +581,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             ],
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () async {
+            onPressed: () {
               addTorrentDialog();
             },
             child: const Icon(Icons.add),
