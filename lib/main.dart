@@ -286,22 +286,59 @@ class ConnectionPageState extends State<ConnectionPage> {
     super.initState();
     ConnectionInfo ci = widget.conn;
     connection = TransmissionConnection(ci.url, ci.username, ci.password);
-    torrents = connection.getTorrents();
+    refreshTorrents();
   }
 
-  void refreshTorrents([Future? action]) {
-    setState(() {
-      if (action == null) {
-        torrents = connection.getTorrents();
+  void errorDialog(TransmissionException e) async {
+    await showDialog(
+      context: context,
+      builder: (builder) {
+        return AlertDialog(
+          title: const Text('Transmission Error'),
+          content: Text(e.message),
+        );
+      },
+    );
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  void refreshTorrents() {
+    torrents = connection.getTorrents().catchError((e) {
+      if (e is TransmissionException) {
+        errorDialog(e);
       } else {
-        torrents = () async {
-          await action;
-          // The wait is to make sure Transmission has a time to process our change before we request the new list
-          await Future.delayed(const Duration(seconds: 1));
-          return await connection.getTorrents();
-        }();
+        errorDialog(TransmissionException('Unknown error'));
       }
+      return <Torrent>[];
     });
+  }
+
+  Future apiAction(Future action, [bool refreshAfter = true]) async {
+    try {
+      if (refreshAfter) {
+        setState(() {
+          torrents = () async {
+            await action;
+            // The wait is to make sure Transmission has a time to process our change before we request the new list
+            await Future.delayed(const Duration(seconds: 1));
+            return await connection.getTorrents();
+          }();
+        });
+      } else {
+        final torrentList = await torrents;
+        setState(() {
+          torrents = () async {
+            await action;
+            return torrentList; // Hack to show loading spinner
+          }();
+        });
+      }
+    } on TransmissionException catch (e) {
+      errorDialog(e);
+    } catch (e) {
+      errorDialog(TransmissionException('Unknown error'));
+    }
   }
 
   Icon statusIcon(TorrentStatus status) {
@@ -309,15 +346,15 @@ class ConnectionPageState extends State<ConnectionPage> {
       case TorrentStatus.stopped:
         return const Icon(Icons.pause, color: Colors.blue);
       case TorrentStatus.queuedToCheck:
-        return const Icon(Icons.queue); // TODO
+        return const Icon(Icons.list);
       case TorrentStatus.checking:
         return const Icon(Icons.watch);
       case TorrentStatus.queuedToDownload:
-        return const Icon(Icons.queue); // TODO
+        return const Icon(Icons.list);
       case TorrentStatus.downloading:
         return const Icon(Icons.arrow_downward, color: Colors.orange);
       case TorrentStatus.queuedToSeed:
-        return const Icon(Icons.queue); // TODO
+        return const Icon(Icons.list);
       case TorrentStatus.seeding:
         return const Icon(Icons.arrow_upward, color: Colors.green);
     }
@@ -328,20 +365,20 @@ class ConnectionPageState extends State<ConnectionPage> {
             ? [
                 PopupMenuItem(
                   child: const Text('Start'),
-                  onTap: () => refreshTorrents(connection.startTorrent(t.id)),
+                  onTap: () => apiAction(connection.startTorrent(t.id)),
                 )
               ]
             : [
                 PopupMenuItem(
                   child: const Text('Stop'),
-                  onTap: () => refreshTorrents(connection.stopTorrent(t.id)),
+                  onTap: () => apiAction(connection.stopTorrent(t.id)),
                 )
               ]) +
         (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
             ? [
                 PopupMenuItem(
                   child: const Text('Reannounce'),
-                  onTap: () => connection.reannounceTorrent(t.id),
+                  onTap: () => apiAction(connection.reannounceTorrent(t.id), false),
                 )
               ]
             : []) +
@@ -353,20 +390,20 @@ class ConnectionPageState extends State<ConnectionPage> {
               }),
           PopupMenuItem(
             child: const Text('Verify'),
-            onTap: () => refreshTorrents(connection.verifyTorrent(t.id)),
+            onTap: () => apiAction(connection.verifyTorrent(t.id)),
           ),
           PopupMenuItem(
               child: const Text('Remove'),
               onTap: () async {
                 if (await youSure(context)) {
-                  refreshTorrents(connection.removeTorrent(t.id));
+                  apiAction(connection.removeTorrent(t.id));
                 }
               }),
           PopupMenuItem(
               child: const Text('Remove & Delete data'),
               onTap: () async {
                 if (await youSure(context)) {
-                  refreshTorrents(connection.removeTorrent(t.id, true));
+                  apiAction(connection.removeTorrent(t.id, true));
                 }
               }),
         ];
@@ -442,7 +479,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                   ),
                   onPressed: () async {
                     Navigator.of(context).pop();
-                    refreshTorrents(connection.addTorrentByUrl(torrentUrl, downloadDir));
+                    apiAction(connection.addTorrentByUrl(torrentUrl, downloadDir));
                   },
                   child: const Text('Add'),
                 ),

@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
+import 'package:http/http.dart';
 
 enum TorrentStatus {
   stopped,
@@ -14,6 +15,11 @@ enum TorrentStatus {
   String prettyName() {
     return name[0].toUpperCase() + name.substring(1);
   }
+}
+
+class TransmissionException implements Exception {
+  String message;
+  TransmissionException(this.message);
 }
 
 class Torrent {
@@ -54,29 +60,39 @@ class TransmissionConnection {
     if (sessionId != null) {
       headers['x-transmission-session-id'] = sessionId!;
     }
-    // TODO: try-catch
-    final resp = await http.post(
-      rpcUri,
-      body: jsonEncode(body),
-      headers: headers,
-    );
+
+    Response resp;
+    try {
+      resp = await http.post(
+        rpcUri,
+        body: jsonEncode(body),
+        headers: headers,
+      );
+    } catch (e) {
+      throw TransmissionException('Failed to connect to host');
+    }
     if (resp.statusCode == 401) {
-      throw Exception('Invalid login'); // TODO: cleaner
+      throw TransmissionException('Invalid username/password');
     } else if (resp.statusCode == 409) {
       if (isRetry) {
-        throw Exception('Transmission asked to change session id despite just doing so');
+        throw TransmissionException('Transmission keeps asking to change session id');
       }
       sessionId = resp.headers['x-transmission-session-id'];
-      return await tFetch(body, true); // TODO: limit requests
+      return await tFetch(body, true);
     } else if (resp.statusCode < 200 || resp.statusCode >= 300) {
-      throw Exception('Invalid response'); // TODO: cleaner
+      throw TransmissionException('Invalid response. Not a valid RPC url?');
     }
-    // TODO: try-catch (incase response wasn't json)
-    final res = jsonDecode(resp.body);
+
+    dynamic res;
+    try {
+      res = jsonDecode(resp.body);
+    } catch (e) {
+      throw TransmissionException('Invalid response. Not a valid RPC url?');
+    }
     if (res['result'] == 'success') {
       return res['arguments'];
     } else {
-      throw Exception('Transmission rejected request'); // TODO: cleaner
+      throw TransmissionException('Transmission rejected API request');
     }
   }
 
