@@ -279,7 +279,8 @@ class ConnectionPageState extends State<ConnectionPage> {
   Offset tapPos = Offset.zero;
 
   late TransmissionConnection connection;
-  late Future<List<Torrent>> torrents;
+  List<Torrent> torrents = [];
+  Future<void> loading = Future.value();
 
   @override
   void initState() {
@@ -303,44 +304,34 @@ class ConnectionPageState extends State<ConnectionPage> {
     Navigator.of(context).pop();
   }
 
-  void refreshTorrents() {
+  Future<T?> loadTask<T>(Future<T> task) async {
+    await loading;
     setState(() {
-      torrents = connection.getTorrents().catchError((e) {
-        if (e is TransmissionException) {
-          errorDialog(e);
-        } else {
-          errorDialog(TransmissionException('Unknown error'));
-        }
-        return <Torrent>[];
-      });
+      loading = task;
+    });
+    try {
+      return await task;
+    } on TransmissionException catch (e) {
+      errorDialog(e);
+      return null;
+    } catch (e) {
+      errorDialog(TransmissionException('Unknown error'));
+      return null;
+    }
+  }
+
+  Future refreshTorrents() async {
+    final ts = await loadTask(connection.getTorrents());
+    setState(() {
+      torrents = ts ?? [];
     });
   }
 
-  Future apiAction(Future action, [bool refreshAfter = true]) async {
-    try {
-      if (refreshAfter) {
-        setState(() {
-          torrents = () async {
-            await action;
-            // The wait is to make sure Transmission has a time to process our change before we request the new list
-            await Future.delayed(const Duration(seconds: 1));
-            return await connection.getTorrents();
-          }();
-        });
-      } else {
-        final torrentList = await torrents;
-        setState(() {
-          torrents = () async {
-            await action;
-            return torrentList; // Hack to show loading spinner
-          }();
-        });
-      }
-    } on TransmissionException catch (e) {
-      errorDialog(e);
-    } catch (e) {
-      errorDialog(TransmissionException('Unknown error'));
-    }
+  Future apiLoadRefresh(Future action) async {
+    await loadTask(action);
+    // The wait is to make sure transmission has time to process our request
+    await loadTask(Future.delayed(const Duration(seconds: 1)));
+    await refreshTorrents();
   }
 
   Icon statusIcon(TorrentStatus status) {
@@ -367,20 +358,20 @@ class ConnectionPageState extends State<ConnectionPage> {
             ? [
                 PopupMenuItem(
                   child: const Text('Start'),
-                  onTap: () => apiAction(connection.startTorrent(t.id)),
+                  onTap: () => apiLoadRefresh(connection.startTorrent(t.id)),
                 )
               ]
             : [
                 PopupMenuItem(
                   child: const Text('Stop'),
-                  onTap: () => apiAction(connection.stopTorrent(t.id)),
+                  onTap: () => apiLoadRefresh(connection.stopTorrent(t.id)),
                 )
               ]) +
         (t.status == TorrentStatus.downloading || t.status == TorrentStatus.seeding
             ? [
                 PopupMenuItem(
                   child: const Text('Reannounce'),
-                  onTap: () => apiAction(connection.reannounceTorrent(t.id), false),
+                  onTap: () => loadTask(connection.reannounceTorrent(t.id)),
                 )
               ]
             : []) +
@@ -392,20 +383,20 @@ class ConnectionPageState extends State<ConnectionPage> {
               }),
           PopupMenuItem(
             child: const Text('Verify'),
-            onTap: () => apiAction(connection.verifyTorrent(t.id)),
+            onTap: () => apiLoadRefresh(connection.verifyTorrent(t.id)),
           ),
           PopupMenuItem(
               child: const Text('Remove'),
               onTap: () async {
                 if (await youSure(context)) {
-                  apiAction(connection.removeTorrent(t.id));
+                  apiLoadRefresh(connection.removeTorrent(t.id));
                 }
               }),
           PopupMenuItem(
               child: const Text('Remove & Delete data'),
               onTap: () async {
                 if (await youSure(context)) {
-                  apiAction(connection.removeTorrent(t.id, true));
+                  apiLoadRefresh(connection.removeTorrent(t.id, true));
                 }
               }),
         ];
@@ -481,7 +472,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                   ),
                   onPressed: () async {
                     Navigator.of(context).pop();
-                    apiAction(connection.addTorrentByUrl(torrentUrl, downloadDir));
+                    apiLoadRefresh(connection.addTorrentByUrl(torrentUrl, downloadDir));
                   },
                   child: const Text('Add'),
                 ),
@@ -495,8 +486,8 @@ class ConnectionPageState extends State<ConnectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<Torrent>>(
-      future: torrents,
+    return FutureBuilder<void>(
+      future: loading,
       builder: ((context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
@@ -526,7 +517,7 @@ class ConnectionPageState extends State<ConnectionPage> {
               DataColumn2(label: Text('Down'), size: ColumnSize.S, numeric: true),
             ],
             rows: [
-              for (final t in snapshot.data!)
+              for (final t in torrents)
                 DataRow2(
                   cells: [
                     DataCell(Row(children: [
