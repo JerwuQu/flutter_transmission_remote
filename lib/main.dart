@@ -304,13 +304,15 @@ class ConnectionPageState extends State<ConnectionPage> {
   }
 
   void refreshTorrents() {
-    torrents = connection.getTorrents().catchError((e) {
-      if (e is TransmissionException) {
-        errorDialog(e);
-      } else {
-        errorDialog(TransmissionException('Unknown error'));
-      }
-      return <Torrent>[];
+    setState(() {
+      torrents = connection.getTorrents().catchError((e) {
+        if (e is TransmissionException) {
+          errorDialog(e);
+        } else {
+          errorDialog(TransmissionException('Unknown error'));
+        }
+        return <Torrent>[];
+      });
     });
   }
 
@@ -513,11 +515,15 @@ class ConnectionPageState extends State<ConnectionPage> {
             ],
           ),
           body: DataTable2(
-            scrollController: AdjustableScrollController(100),
+            lmRatio: 2,
+            smRatio: 0.4,
+            columnSpacing: 5,
+            scrollController: AdjustableScrollController(100), // TODO: keep offset after refresh
             columns: const [
               DataColumn2(label: Text('Name'), size: ColumnSize.L),
               DataColumn2(label: Text('Size'), size: ColumnSize.S, numeric: true),
-              DataColumn2(label: Text('Up/Down'), size: ColumnSize.S),
+              DataColumn2(label: Text('Up'), size: ColumnSize.S, numeric: true),
+              DataColumn2(label: Text('Down'), size: ColumnSize.S, numeric: true),
             ],
             rows: [
               for (final t in snapshot.data!)
@@ -528,11 +534,14 @@ class ConnectionPageState extends State<ConnectionPage> {
                       const SizedBox(width: 10),
                       Expanded(child: Text(t.name)),
                     ])),
-                    DataCell(Text(t.bytesLeft == null || t.size == null || t.bytesLeft == 0
-                        ? formatOpBytes(t.size)
-                        : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}')),
-                    DataCell(
-                        Text('${formatOpBytes(t.upSpeed)}/s / ${formatOpBytes(t.downSpeed)}/s')),
+                    DataCell(Text(
+                      t.bytesLeft == null || t.size == null || t.bytesLeft == 0
+                          ? formatOpBytes(t.size)
+                          : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}',
+                      textAlign: TextAlign.right,
+                    )),
+                    DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
+                    DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
                   ],
                   onTap: () {},
                   onSecondaryTapDown: (details) => tapPos = details.globalPosition,
