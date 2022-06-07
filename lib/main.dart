@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -6,12 +7,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:collection/collection.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:file_picker/file_picker.dart';
 import 'dart:convert';
 
 import 'transmission.dart';
 
 void main() {
   runApp(const MyApp());
+}
+
+Future showError(BuildContext context, String title, String message) async {
+  await showDialog(
+    context: context,
+    builder: (builder) {
+      return AlertDialog(
+        title: Text(title),
+        content: Text(message),
+      );
+    },
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -267,6 +281,196 @@ class ConnectionListPageState extends State<ConnectionListPage> {
   }
 }
 
+class DownloadDirPicker extends StatefulWidget {
+  final List<Torrent> torrents;
+  final void Function(String) onChanged;
+  const DownloadDirPicker(this.torrents, {required this.onChanged, Key? key}) : super(key: key);
+
+  @override
+  State<DownloadDirPicker> createState() => DownloadDirPickerState();
+}
+
+class DownloadDirPickerState extends State<DownloadDirPicker> {
+  final downloadDirController = TextEditingController(text: '');
+
+  @override
+  void initState() {
+    super.initState();
+    downloadDirController.text = widget.torrents.firstOrNull?.downloadDir ?? '';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        PopupMenuButton(
+          constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
+          tooltip: 'Choose from current torrents',
+          itemBuilder: (BuildContext context) {
+            return widget.torrents
+                .map((t) => t.downloadDir)
+                .toSet()
+                .map((d) => PopupMenuItem(value: d, child: Text(d)))
+                .toList();
+          },
+          onSelected: (str) {
+            setState(() {
+              downloadDirController.text = str as String;
+              widget.onChanged(str);
+            });
+          },
+        ),
+        Expanded(
+          child: TextFormField(
+            controller: downloadDirController,
+            decoration: const InputDecoration(
+              hintText: '~/Download',
+              labelText: 'Download directory',
+            ),
+            onChanged: (str) => widget.onChanged(str),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class AddTorrentDialog extends StatefulWidget {
+  final List<Torrent> torrents;
+  final void Function(Uint8List data, String dir) onAddFromFile;
+  final void Function(String url, String dir) onAddByUrl;
+  const AddTorrentDialog(
+    this.torrents, {
+    required this.onAddFromFile,
+    required this.onAddByUrl,
+    Key? key,
+  }) : super(key: key);
+
+  @override
+  State<AddTorrentDialog> createState() => AddTorrentDialogState();
+}
+
+class AddTorrentDialogState extends State<AddTorrentDialog> {
+  bool preferTorrentFile = false;
+  String downloadDir = '';
+
+  String torrentUrl = '';
+
+  String pickedFilename = '';
+  Uint8List? torrentFileData;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                    const Text('URL'),
+                    Radio<bool>(
+                      value: false,
+                      groupValue: preferTorrentFile,
+                      onChanged: (v) => setState(() => preferTorrentFile = v ?? false),
+                    ),
+                    const Text('File'),
+                    Radio<bool>(
+                      value: true,
+                      groupValue: preferTorrentFile,
+                      onChanged: (v) => setState(() => preferTorrentFile = v ?? true),
+                    ),
+                    const SizedBox(width: 10),
+                  ] +
+                  (preferTorrentFile
+                      ? [
+                          TextButton(
+                            style: TextButton.styleFrom(
+                              primary: Theme.of(context).colorScheme.primary,
+                              backgroundColor: Theme.of(context).colorScheme.surface,
+                              elevation: 3,
+                              padding: const EdgeInsets.all(8),
+                            ),
+                            onPressed: () async {
+                              FilePickerResult? result = await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['torrent'],
+                                withData: true,
+                              );
+                              if (!mounted) return;
+                              if (result == null) {
+                                setState(() {
+                                  pickedFilename = '';
+                                  torrentFileData = null;
+                                });
+                              } else {
+                                if (result.files.first.bytes == null) {
+                                  showError(context, 'Failed to load', 'Failed to load the file');
+                                  return;
+                                }
+                                setState(() {
+                                  pickedFilename = result.files.first.name;
+                                  torrentFileData = result.files.first.bytes!;
+                                });
+                              }
+                            },
+                            child: const Text('Pick File'),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(pickedFilename),
+                        ]
+                      : [
+                          Expanded(
+                            child: TextFormField(
+                              decoration: const InputDecoration(
+                                hintText: 'https://...',
+                                labelText: 'Torrent URL',
+                              ),
+                              onChanged: (str) => torrentUrl = str,
+                            ),
+                          ),
+                        ]),
+            ),
+            DownloadDirPicker(
+              widget.torrents,
+              onChanged: (dir) => downloadDir = dir,
+            ),
+            const SizedBox(height: 10),
+            TextButton(
+              style: TextButton.styleFrom(
+                primary: Theme.of(context).colorScheme.primary,
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                elevation: 3,
+                padding: const EdgeInsets.all(8),
+              ),
+              onPressed: () async {
+                if (preferTorrentFile) {
+                  if (torrentFileData == null) {
+                    await showError(context, 'No file', 'You need to select a file');
+                    return;
+                  }
+                  Navigator.of(context).pop();
+                  widget.onAddFromFile(torrentFileData!, downloadDir);
+                } else {
+                  Navigator.of(context).pop();
+                  widget.onAddByUrl(torrentUrl, downloadDir);
+                }
+              },
+              child: const Text('Add'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ConnectionPage extends StatefulWidget {
   final ConnectionInfo conn;
   const ConnectionPage({required this.conn, Key? key}) : super(key: key);
@@ -291,15 +495,7 @@ class ConnectionPageState extends State<ConnectionPage> {
   }
 
   void errorDialog(TransmissionException e) async {
-    await showDialog(
-      context: context,
-      builder: (builder) {
-        return AlertDialog(
-          title: const Text('Transmission Error'),
-          content: Text(e.message),
-        );
-      },
-    );
+    await showError(context, 'Transmission Error', e.message);
     if (!mounted) return;
     Navigator.of(context).pop();
   }
@@ -412,73 +608,18 @@ class ConnectionPageState extends State<ConnectionPage> {
     );
   }
 
-  void addTorrentDialog() async {
-    final torrentList = await torrents;
-    String torrentUrl = '';
-    String downloadDir = torrentList.firstOrNull?.downloadDir ?? '';
-    final downloadDirController = TextEditingController(text: downloadDir);
+  void showAddTorrentDialog() async {
     await showDialog(
       context: context,
       builder: (BuildContext context) {
-        return Dialog(
-          child: Padding(
-            padding: const EdgeInsets.all(8),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextFormField(
-                  decoration: const InputDecoration(
-                    hintText: 'https://...',
-                    labelText: 'Torrent URL',
-                  ),
-                  onChanged: (str) => torrentUrl = str,
-                ),
-                Row(
-                  children: [
-                    PopupMenuButton(
-                      constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width),
-                      tooltip: 'Choose from current torrents',
-                      itemBuilder: (BuildContext context) {
-                        return torrentList
-                            .map((t) => t.downloadDir)
-                            .toSet()
-                            .map((d) => PopupMenuItem(value: d, child: Text(d)))
-                            .toList();
-                      },
-                      onSelected: (str) {
-                        downloadDir = str as String;
-                        downloadDirController.text = downloadDir;
-                      },
-                    ),
-                    Expanded(
-                      child: TextFormField(
-                        controller: downloadDirController,
-                        decoration: const InputDecoration(
-                          hintText: '~/Download',
-                          labelText: 'Download directory',
-                        ),
-                        onChanged: (str) => downloadDir = str,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 10),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    primary: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    elevation: 3,
-                    padding: const EdgeInsets.all(8),
-                  ),
-                  onPressed: () async {
-                    Navigator.of(context).pop();
-                    apiLoadRefresh(connection.addTorrentByUrl(torrentUrl, downloadDir));
-                  },
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-          ),
+        return AddTorrentDialog(
+          torrents,
+          onAddFromFile: (data, dir) {
+            apiLoadRefresh(connection.addTorrentFromFile(data, dir));
+          },
+          onAddByUrl: (url, dir) {
+            apiLoadRefresh(connection.addTorrentByUrl(url, dir));
+          },
         );
       },
     );
@@ -592,9 +733,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             ],
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              addTorrentDialog();
-            },
+            onPressed: () => showAddTorrentDialog(),
             child: const Icon(Icons.add),
           ),
         );

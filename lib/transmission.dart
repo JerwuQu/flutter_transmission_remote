@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
@@ -128,6 +129,16 @@ class TransmissionConnection {
       'method': 'torrent-add',
       'arguments': {
         'filename': torrentUrl,
+        'download-dir': downloadDir,
+      }
+    });
+  }
+
+  Future addTorrentFromFile(Uint8List bytes, String downloadDir) async {
+    await tFetch({
+      'method': 'torrent-add',
+      'arguments': {
+        'metainfo': base64Encode(bytes),
         'download-dir': downloadDir,
       }
     });
