@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -8,7 +9,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:collection/collection.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:file_picker/file_picker.dart';
-import 'dart:convert';
 
 import 'transmission.dart';
 
@@ -284,7 +284,9 @@ class ConnectionListPageState extends State<ConnectionListPage> {
 class DownloadDirPicker extends StatefulWidget {
   final List<Torrent> torrents;
   final void Function(String) onChanged;
-  const DownloadDirPicker(this.torrents, {required this.onChanged, Key? key}) : super(key: key);
+  final String? initialDir;
+  const DownloadDirPicker(this.torrents, {required this.onChanged, this.initialDir, Key? key})
+      : super(key: key);
 
   @override
   State<DownloadDirPicker> createState() => DownloadDirPickerState();
@@ -296,7 +298,8 @@ class DownloadDirPickerState extends State<DownloadDirPicker> {
   @override
   void initState() {
     super.initState();
-    downloadDirController.text = widget.torrents.firstOrNull?.downloadDir ?? '';
+    downloadDirController.text =
+        widget.initialDir ?? widget.torrents.firstOrNull?.downloadDir ?? '';
   }
 
   @override
@@ -320,6 +323,7 @@ class DownloadDirPickerState extends State<DownloadDirPicker> {
             });
           },
         ),
+        const SizedBox(width: 8),
         Expanded(
           child: TextFormField(
             controller: downloadDirController,
@@ -368,7 +372,7 @@ class AddTorrentDialogState extends State<AddTorrentDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -573,10 +577,14 @@ class ConnectionPageState extends State<ConnectionPage> {
             : []) +
         [
           PopupMenuItem(
-              child: const Text('Move'),
-              onTap: () async {
-                // TODO
-              }),
+            child: const Text('Move'),
+            onTap: () {
+              // `addPostFrameCallback` is required because popup will close the dialog otherwise
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                showMoveTorrentDialog(t);
+              });
+            },
+          ),
           PopupMenuItem(
             child: const Text('Verify'),
             onTap: () => apiLoadRefresh(connection.verifyTorrent(t.id)),
@@ -620,6 +628,40 @@ class ConnectionPageState extends State<ConnectionPage> {
           onAddByUrl: (url, dir) {
             apiLoadRefresh(connection.addTorrentByUrl(url, dir));
           },
+        );
+      },
+    );
+  }
+
+  void showMoveTorrentDialog(Torrent t) async {
+    String dir = t.downloadDir;
+    await showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return Dialog(
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: DownloadDirPicker(torrents, initialDir: dir, onChanged: (d) => dir = d),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    apiLoadRefresh(connection.moveTorrent(t.id, dir));
+                  },
+                  style: TextButton.styleFrom(
+                    primary: Theme.of(context).colorScheme.primary,
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    elevation: 3,
+                    padding: const EdgeInsets.all(8),
+                  ),
+                  child: const Text('Move'),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
