@@ -44,8 +44,12 @@ class MyApp extends StatelessWidget {
   }
 }
 
-// from: https://stackoverflow.com/a/71427895
+// Originally from: https://stackoverflow.com/a/71427895
+// - Adjustable scroll speed
+// - Saves scroll position between clients
 class AdjustableScrollController extends ScrollController {
+  double? savedPos;
+
   AdjustableScrollController([int extraScrollSpeed = 40]) {
     super.addListener(() {
       ScrollDirection scrollDirection = super.position.userScrollDirection;
@@ -57,6 +61,20 @@ class AdjustableScrollController extends ScrollController {
         jumpTo(scrollEnd);
       }
     });
+  }
+
+  @override
+  void attach(ScrollPosition position) {
+    if (savedPos != null) {
+      position.correctPixels(savedPos!);
+    }
+    super.attach(position);
+  }
+
+  @override
+  void detach(ScrollPosition position) {
+    savedPos = offset;
+    super.detach(position);
   }
 }
 
@@ -490,6 +508,8 @@ class ConnectionPageState extends State<ConnectionPage> {
   List<Torrent> torrents = [];
   Future<void> loading = Future.value();
 
+  AdjustableScrollController scrollController = AdjustableScrollController(100);
+
   @override
   void initState() {
     super.initState();
@@ -715,7 +735,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             lmRatio: 2,
             smRatio: 0.4,
             columnSpacing: 5,
-            scrollController: AdjustableScrollController(100), // TODO: keep offset after refresh
+            scrollController: scrollController,
             sortAscending: _sortAscending,
             sortColumnIndex: _sortColumnIndex,
             columns: [
