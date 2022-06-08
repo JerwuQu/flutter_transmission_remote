@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_fonts/google_fonts.dart';
+import 'package:google_fonts/google_fonts.dart'; // TODO: remove
 import 'package:collection/collection.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:file_picker/file_picker.dart';
@@ -731,68 +731,70 @@ class ConnectionPageState extends State<ConnectionPage> {
               )
             ],
           ),
-          body: DataTable2(
-            lmRatio: 2,
-            smRatio: 0.4,
-            columnSpacing: 5,
-            scrollController: scrollController,
-            sortAscending: _sortAscending,
-            sortColumnIndex: _sortColumnIndex,
-            columns: [
-              DataColumn2(
-                label: const Text('Name'),
-                size: ColumnSize.L,
-                onSort: (col, asc) => _sort((t) => t.name, col, asc),
-              ),
-              DataColumn2(
-                label: const Text('Date Added'),
-                size: ColumnSize.S,
-                onSort: (col, asc) => _sort<num>((t) => t.addedDate, col, asc),
-              ),
-              DataColumn2(
-                label: const Text('Size'),
-                size: ColumnSize.S,
-                numeric: true,
-                onSort: (col, asc) => _sort<num>((t) => t.size ?? 0, col, asc),
-              ),
-              DataColumn2(
-                label: const Text('Up'),
-                size: ColumnSize.S,
-                numeric: true,
-                onSort: (col, asc) => _sort<num>((t) => t.upSpeed ?? 0, col, asc),
-              ),
-              DataColumn2(
-                label: const Text('Down'),
-                size: ColumnSize.S,
-                numeric: true,
-                onSort: (col, asc) => _sort<num>((t) => t.downSpeed ?? 0, col, asc),
-              ),
-            ],
-            rows: [
-              for (final t in torrents)
-                DataRow2(
-                  cells: [
-                    DataCell(Row(children: [
-                      statusIcon(t.status),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text(t.name)),
-                    ])),
-                    DataCell(Text(dateString(t.addedDate), textAlign: TextAlign.center)),
-                    DataCell(Text(
-                      t.bytesLeft == null || t.size == null || t.bytesLeft == 0
-                          ? formatOpBytes(t.size)
-                          : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}',
-                      textAlign: TextAlign.right,
-                    )),
-                    DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
-                    DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
-                  ],
-                  onTap: () {},
-                  onSecondaryTapDown: (details) => tapPos = details.globalPosition,
-                  // TODO: add onTapDown to data_table_2 and use onTap instead of onSecondaryTap
-                  onSecondaryTap: () => showTorrentMenu(t),
+          body: Listener(
+            onPointerDown: (details) => tapPos = details.position,
+            child: DataTable2(
+              lmRatio: 2,
+              smRatio: 0.4,
+              columnSpacing: 5,
+              scrollController: scrollController,
+              sortAscending: _sortAscending,
+              sortColumnIndex: _sortColumnIndex,
+              columns: [
+                DataColumn2(
+                  label: const Text('Name'),
+                  size: ColumnSize.L,
+                  onSort: (col, asc) => _sort((t) => t.name, col, asc),
                 ),
-            ],
+                DataColumn2(
+                  label: const Text('Date Added'),
+                  size: ColumnSize.S,
+                  onSort: (col, asc) => _sort<num>((t) => t.addedDate, col, asc),
+                ),
+                DataColumn2(
+                  label: const Text('Size'),
+                  size: ColumnSize.S,
+                  numeric: true,
+                  onSort: (col, asc) => _sort<num>((t) => t.size ?? 0, col, asc),
+                ),
+                DataColumn2(
+                  label: const Text('Up'),
+                  size: ColumnSize.S,
+                  numeric: true,
+                  onSort: (col, asc) => _sort<num>((t) => t.upSpeed ?? 0, col, asc),
+                ),
+                DataColumn2(
+                  label: const Text('Down'),
+                  size: ColumnSize.S,
+                  numeric: true,
+                  onSort: (col, asc) => _sort<num>((t) => t.downSpeed ?? 0, col, asc),
+                ),
+              ],
+              rows: [
+                for (final t in torrents)
+                  DataRow2(
+                    cells: [
+                      DataCell(Row(children: [
+                        statusIcon(t.status),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(t.name)),
+                      ])),
+                      DataCell(Text(dateString(t.addedDate), textAlign: TextAlign.center)),
+                      DataCell(Text(
+                        t.bytesLeft == null || t.size == null || t.bytesLeft == 0
+                            ? formatOpBytes(t.size)
+                            : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}',
+                        textAlign: TextAlign.right,
+                      )),
+                      DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
+                      DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
+                    ],
+                    onLongPress: () => showTorrentMenu(t),
+                    onSecondaryTap: () => showTorrentMenu(t),
+                    onSecondaryTapDown: (details) => tapPos = details.globalPosition,
+                  ),
+              ],
+            ),
           ),
           floatingActionButton: FloatingActionButton(
             onPressed: () => showAddTorrentDialog(),
