@@ -114,6 +114,11 @@ String formatBytes(int bytes) {
 
 String formatOpBytes(int? bytes) => bytes == null ? '?' : formatBytes(bytes);
 
+String dateString(int secs) {
+  final iso = DateTime.fromMillisecondsSinceEpoch(secs * 1000).toLocal().toIso8601String();
+  return iso.substring(0, iso.indexOf('.')).replaceFirst('T', '\n');
+}
+
 class ConnectionInfo {
   String url, username, password;
 
@@ -544,6 +549,7 @@ class ConnectionPageState extends State<ConnectionPage> {
     final ts = await loadTask(connection.getTorrents());
     setState(() {
       torrents = ts ?? [];
+      // TODO: re-sort according to current sorting
     });
   }
 
@@ -611,17 +617,23 @@ class ConnectionPageState extends State<ConnectionPage> {
           ),
           PopupMenuItem(
               child: const Text('Remove'),
-              onTap: () async {
-                if (await youSure(context)) {
-                  apiLoadRefresh(connection.removeTorrent(t.id));
-                }
+              onTap: () {
+                // `addPostFrameCallback` is required because popup will close the dialog otherwise
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (await youSure(context)) {
+                    apiLoadRefresh(connection.removeTorrent(t.id));
+                  }
+                });
               }),
           PopupMenuItem(
               child: const Text('Remove & Delete data'),
-              onTap: () async {
-                if (await youSure(context)) {
-                  apiLoadRefresh(connection.removeTorrent(t.id, true));
-                }
+              onTap: () {
+                // `addPostFrameCallback` is required because popup will close the dialog otherwise
+                WidgetsBinding.instance.addPostFrameCallback((_) async {
+                  if (await youSure(context)) {
+                    apiLoadRefresh(connection.removeTorrent(t.id, true));
+                  }
+                });
               }),
         ];
   }
@@ -705,11 +717,6 @@ class ConnectionPageState extends State<ConnectionPage> {
     });
   }
 
-  String dateString(int secs) {
-    final iso = DateTime.fromMillisecondsSinceEpoch(secs * 1000).toLocal().toIso8601String();
-    return iso.substring(0, iso.indexOf('.')).replaceFirst('T', '\n');
-  }
-
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<void>(
@@ -725,6 +732,7 @@ class ConnectionPageState extends State<ConnectionPage> {
           appBar: AppBar(
             title: const Text('Torrents'),
             actions: [
+              // TODO: search
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: () => refreshTorrents(),
@@ -747,7 +755,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                   onSort: (col, asc) => _sort((t) => t.name, col, asc),
                 ),
                 DataColumn2(
-                  label: const Text('Date Added'),
+                  label: const Text('Date added'),
                   size: ColumnSize.S,
                   onSort: (col, asc) => _sort<num>((t) => t.addedDate, col, asc),
                 ),
@@ -789,6 +797,9 @@ class ConnectionPageState extends State<ConnectionPage> {
                       DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
                       DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
                     ],
+                    onTap: () {
+                      Navigator.push(context, MaterialPageRoute(builder: (ctx) => TorrentPage(t)));
+                    },
                     onLongPress: () => showTorrentMenu(t),
                     onSecondaryTap: () => showTorrentMenu(t),
                     onSecondaryTapDown: (details) => tapPos = details.globalPosition,
@@ -802,6 +813,51 @@ class ConnectionPageState extends State<ConnectionPage> {
           ),
         );
       }),
+    );
+  }
+}
+
+class TorrentPage extends StatelessWidget {
+  final Torrent t;
+  const TorrentPage(this.t, {Key? key}) : super(key: key);
+
+  Widget propRow(String title, String? value) {
+    return ListTile(
+      title: Row(
+        children: [
+          Expanded(child: Text(title)),
+          Expanded(child: Text(value ?? '<null>', textAlign: TextAlign.right)),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      // TODO: reload button
+      appBar: AppBar(title: const Text('Torrent')),
+      body: Listener(
+        child: ListView(
+          controller: AdjustableScrollController(100),
+          children: [
+            propRow('Name', t.name),
+            propRow('Status', t.status.name),
+            propRow('Date added', dateString(t.addedDate)),
+            propRow(
+              'Size',
+              t.bytesLeft == null || t.size == null || t.bytesLeft == 0
+                  ? formatOpBytes(t.size)
+                  : '${formatOpBytes(t.size! - t.bytesLeft!)}/${formatOpBytes(t.size)}',
+            ),
+            propRow('Download speed', '${formatOpBytes(t.downSpeed)}/s'),
+            propRow('Upload speed', '${formatOpBytes(t.upSpeed)}/s'),
+            propRow('Total downloaded', formatOpBytes(t.downTotal)),
+            propRow('Total uploaded', formatOpBytes(t.upTotal)),
+            propRow('Download dir', t.downloadDir),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -27,20 +27,22 @@ class Torrent {
   int id, addedDate;
   TorrentStatus status;
   String name, downloadDir, errorString;
-  int? size, bytesLeft, seeds, leeches, downSpeed, upSpeed;
+  int? size, bytesLeft, seeds, leeches, downSpeed, upSpeed, downTotal, upTotal;
   Torrent.fromJson(dynamic json)
-      : id = json['id'],
-        name = json['name'],
-        status = TorrentStatus.values[json['status']],
-        downloadDir = json['downloadDir'],
-        errorString = json['errorString'],
-        addedDate = json['addedDate'],
-        size = json['sizeWhenDone'],
+      : addedDate = json['addedDate'],
         bytesLeft = json['leftUntilDone'],
-        seeds = json['peersSendingToUs'],
-        leeches = json['peersGettingFromUs'],
+        downloadDir = json['downloadDir'],
         downSpeed = json['rateDownload'],
-        upSpeed = json['rateUpload'];
+        downTotal = json['downloadedEver'],
+        errorString = json['errorString'],
+        leeches = json['peersGettingFromUs'],
+        name = json['name'],
+        seeds = json['peersSendingToUs'],
+        size = json['sizeWhenDone'],
+        status = TorrentStatus.values[json['status']],
+        upSpeed = json['rateUpload'],
+        upTotal = json['uploadedEver'],
+        id = json['id'];
 }
 
 class TransmissionConnection {
@@ -102,19 +104,22 @@ class TransmissionConnection {
       'method': 'torrent-get',
       'arguments': {
         'fields': [
-          'id',
-          'name',
-          'status',
           'addedDate',
+          'downloadDir',
+          'downloadedEver',
           'errorString',
           'eta',
+          'id',
           'leftUntilDone',
-          'downloadDir',
+          'name',
           'peersGettingFromUs',
           'peersSendingToUs',
           'rateDownload',
           'rateUpload',
+          'recheckProgress',
           'sizeWhenDone',
+          'status',
+          'uploadedEver',
         ]
       },
     });
