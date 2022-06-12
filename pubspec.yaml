@@ -38,9 +38,10 @@ dependencies:
   google_fonts: ^3.0.1
   collection: ^1.16.0
   http: ^0.13.4
-
   file_picker: ^4.5.0
   data_table_2: ^2.3.0
+  jwq_utils:
+    git: https://github.com/JerwuQu/flutter_jwq_utils.git
 
 dev_dependencies:
   flutter_test:

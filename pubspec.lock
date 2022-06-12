@@ -149,6 +149,15 @@ packages:
       url: "https://pub.dartlang.org"
     source: hosted
     version: "0.6.4"
+  jwq_utils:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: HEAD
+      resolved-ref: "5257063163cd2849564827001ff50bd1a66ff825"
+      url: "https://github.com/JerwuQu/flutter_jwq_utils.git"
+    source: git
+    version: "0.0.1"
   lints:
     dependency: transitive
     description:

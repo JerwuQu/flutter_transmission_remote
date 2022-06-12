@@ -1,31 +1,18 @@
-import 'dart:math';
 import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_fonts/google_fonts.dart'; // TODO: remove
 import 'package:collection/collection.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:jwq_utils/jwq_utils.dart';
 
 import 'transmission.dart';
 
 void main() {
   runApp(const MyApp());
-}
-
-Future showError(BuildContext context, String title, String message) async {
-  await showDialog(
-    context: context,
-    builder: (builder) {
-      return AlertDialog(
-        title: Text(title),
-        content: Text(message),
-      );
-    },
-  );
 }
 
 class MyApp extends StatelessWidget {
@@ -42,81 +29,6 @@ class MyApp extends StatelessWidget {
       home: const ConnectionListPage(),
     );
   }
-}
-
-// Originally from: https://stackoverflow.com/a/71427895
-// - Adjustable scroll speed
-// - Saves scroll position between clients
-class AdjustableScrollController extends ScrollController {
-  double? savedPos;
-
-  AdjustableScrollController([int extraScrollSpeed = 40]) {
-    super.addListener(() {
-      ScrollDirection scrollDirection = super.position.userScrollDirection;
-      if (scrollDirection != ScrollDirection.idle) {
-        double scrollEnd = super.offset +
-            (scrollDirection == ScrollDirection.reverse ? extraScrollSpeed : -extraScrollSpeed);
-        scrollEnd =
-            min(super.position.maxScrollExtent, max(super.position.minScrollExtent, scrollEnd));
-        jumpTo(scrollEnd);
-      }
-    });
-  }
-
-  @override
-  void attach(ScrollPosition position) {
-    if (savedPos != null) {
-      position.correctPixels(savedPos!);
-    }
-    super.attach(position);
-  }
-
-  @override
-  void detach(ScrollPosition position) {
-    savedPos = offset;
-    super.detach(position);
-  }
-}
-
-Future<bool> youSure(BuildContext context, [String title = 'Are you sure?']) async {
-  bool response = false;
-  await showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(title),
-          actions: [
-            TextButton(
-                child: const Text('Yes'),
-                onPressed: () {
-                  response = true;
-                  Navigator.of(context).pop();
-                }),
-            TextButton(
-                child: const Text('No'),
-                onPressed: () {
-                  response = false;
-                  Navigator.of(context).pop();
-                }),
-          ],
-        );
-      });
-  return response;
-}
-
-String formatBytes(int bytes) {
-  if (bytes <= 0) {
-    return '0 B';
-  }
-  final int i = (log(bytes) / log(1024)).floor();
-  return '${(bytes * 100 / pow(1024, i)).round() / 100} ${['B', 'KB', 'MB', 'GB', 'TB'][i]}';
-}
-
-String formatOpBytes(int? bytes) => bytes == null ? '?' : formatBytes(bytes);
-
-String dateString(int secs) {
-  final iso = DateTime.fromMillisecondsSinceEpoch(secs * 1000).toLocal().toIso8601String();
-  return iso.substring(0, iso.indexOf('.')).replaceFirst('T', '\n');
 }
 
 class ConnectionInfo {
@@ -241,7 +153,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                                     padding: const EdgeInsets.all(8),
                                   ),
                                   onPressed: () async {
-                                    if (await youSure(context)) {
+                                    if (await confirm(context)) {
                                       setState(() {
                                         connections.removeAt(index);
                                         savePrefs();
@@ -620,7 +532,7 @@ class ConnectionPageState extends State<ConnectionPage> {
               onTap: () {
                 // `addPostFrameCallback` is required because popup will close the dialog otherwise
                 WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  if (await youSure(context)) {
+                  if (await confirm(context)) {
                     apiLoadRefresh(connection.removeTorrent(t.id));
                   }
                 });
@@ -630,7 +542,7 @@ class ConnectionPageState extends State<ConnectionPage> {
               onTap: () {
                 // `addPostFrameCallback` is required because popup will close the dialog otherwise
                 WidgetsBinding.instance.addPostFrameCallback((_) async {
-                  if (await youSure(context)) {
+                  if (await confirm(context)) {
                     apiLoadRefresh(connection.removeTorrent(t.id, true));
                   }
                 });
