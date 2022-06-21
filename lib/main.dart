@@ -11,7 +11,10 @@ import 'package:jwq_utils/jwq_utils.dart';
 
 import 'transmission.dart';
 
-void main() {
+var settings = SettingManager();
+
+void main() async {
+  await settings.load();
   runApp(const MyApp());
 }
 
@@ -32,27 +35,47 @@ class MyApp extends StatelessWidget {
 }
 
 class ConnectionInfo {
-  // TODO: mark as favorite for auto-connect
+  bool autoConnect;
   String url, username, password;
 
   ConnectionInfo.empty()
       : url = '',
         username = '',
-        password = '';
-  ConnectionInfo.copy(ConnectionInfo source)
-      : url = source.url,
-        username = source.username,
-        password = source.password;
+        password = '',
+        autoConnect = false;
 
   ConnectionInfo.fromJson(Map<String, dynamic> json)
       : url = json['url'],
         username = json['username'],
-        password = json['password'];
+        password = json['password'],
+        autoConnect = json['auto'] ?? false;
   toJson() => {
         'url': url,
         'username': username,
         'password': password,
+        'auto': autoConnect,
       };
+}
+
+class SettingManager {
+  // TODO: support storing connections encrypted
+
+  late List<ConnectionInfo> connections;
+
+  Future load() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final connectionsJson = jsonDecode(prefs.getString('connections') ?? '[]');
+    connections =
+        connectionsJson.map<ConnectionInfo>((json) => ConnectionInfo.fromJson(json)).toList();
+  }
+
+  Future save() async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final connectionsJson = jsonEncode(connections.map((c) => c.toJson()).toList());
+    await prefs.setString('connections', connectionsJson);
+  }
 }
 
 class ConnectionListPage extends StatefulWidget {
@@ -63,30 +86,24 @@ class ConnectionListPage extends StatefulWidget {
 }
 
 class ConnectionListPageState extends State<ConnectionListPage> {
-  late List<ConnectionInfo> connections;
-  late Future _loadPrefs;
-
-  ConnectionListPageState() : super() {
-    _loadPrefs = loadPrefs();
-  }
-
-  Future loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final connectionsJson = jsonDecode(prefs.getString('connections') ?? '[]');
-    connections =
-        connectionsJson.map<ConnectionInfo>((json) => ConnectionInfo.fromJson(json)).toList();
-  }
-
-  Future savePrefs() async {
-    final prefs = await SharedPreferences.getInstance();
-    final connectionsJson = jsonEncode(connections.map((c) => c.toJson()).toList());
-    await prefs.setString('connections', connectionsJson);
-    // TODO: support storing connections encrypted
+  @override
+  void initState() {
+    super.initState();
+    final autoConn = settings.connections.firstWhereOrNull((c) => c.autoConnect);
+    if (autoConn != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => ConnectionPage(conn: autoConn)),
+        );
+      });
+    }
   }
 
   Future editConnection([int? index]) async {
-    ConnectionInfo conn =
-        index == null ? ConnectionInfo.empty() : ConnectionInfo.copy(connections[index]);
+    ConnectionInfo conn = index == null
+        ? ConnectionInfo.empty()
+        : ConnectionInfo.fromJson(settings.connections[index].toJson());
     await showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -131,11 +148,11 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                             onPressed: () {
                               setState(() {
                                 if (index == null) {
-                                  connections.add(conn);
+                                  settings.connections.add(conn);
                                 } else {
-                                  connections[index] = conn;
+                                  settings.connections[index] = conn;
                                 }
-                                savePrefs();
+                                settings.save();
                               });
                               return Navigator.of(context).pop();
                             },
@@ -156,8 +173,8 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                                   onPressed: () async {
                                     if (await confirm(context)) {
                                       setState(() {
-                                        connections.removeAt(index);
-                                        savePrefs();
+                                        settings.connections.removeAt(index);
+                                        settings.save();
                                       });
                                       Navigator.of(context).pop();
                                     }
@@ -177,42 +194,49 @@ class ConnectionListPageState extends State<ConnectionListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder(
-      future: _loadPrefs,
-      builder: ((context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Scaffold(
-            appBar: AppBar(title: const Text('Loading...')),
-            body: const Center(child: CircularProgressIndicator()),
-          );
-        }
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Connections'),
-          ),
-          body: ListView(
-            controller: AdjustableScrollController(100),
-            children: connections
-                .mapIndexed<Widget>(
-                  (index, conn) => ListTile(
-                    title: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}'),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (ctx) => ConnectionPage(conn: conn)),
-                      );
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Connections'),
+      ),
+      body: ListView(
+        controller: AdjustableScrollController(100),
+        children: settings.connections
+            .mapIndexed<Widget>(
+              (index, conn) => ListTile(
+                title: Row(children: [
+                  IconButton(
+                    icon: conn.autoConnect
+                        ? const Icon(Icons.auto_awesome)
+                        : const Icon(Icons.auto_awesome_outlined),
+                    color: conn.autoConnect ? Colors.orange : Colors.grey,
+                    onPressed: () {
+                      setState(() {
+                        for (var c in settings.connections) {
+                          c.autoConnect = (c == conn && !c.autoConnect);
+                        }
+                        settings.save();
+                      });
                     },
-                    onLongPress: () => editConnection(index),
                   ),
-                )
-                .toList(),
-          ),
-          floatingActionButton: FloatingActionButton(
-            onPressed: () => editConnection(),
-            child: const Icon(Icons.add),
-          ),
-        );
-      }),
+                  const SizedBox(width: 8),
+                  Expanded(
+                      child: Text(conn.username == '' ? conn.url : '${conn.username}@${conn.url}')),
+                ]),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (ctx) => ConnectionPage(conn: conn)),
+                  );
+                },
+                onLongPress: () => editConnection(index),
+              ),
+            )
+            .toList(),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => editConnection(),
+        child: const Icon(Icons.add),
+      ),
     );
   }
 }
