@@ -32,6 +32,7 @@ class MyApp extends StatelessWidget {
 }
 
 class ConnectionInfo {
+  // TODO: mark as favorite for auto-connect
   String url, username, password;
 
   ConnectionInfo.empty()
@@ -712,7 +713,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (ctx) => TorrentPage(t)));
                     },
-                    onLongPress: () => showTorrentMenu(t),
+                    onLongPress: () => showTorrentMenu(t), // TODO: multi-select
                     onSecondaryTap: () => showTorrentMenu(t),
                     onSecondaryTapDown: (details) => tapPos = details.globalPosition,
                   ),
@@ -767,6 +768,7 @@ class TorrentPage extends StatelessWidget {
             propRow('Total downloaded', formatOpBytes(t.downTotal)),
             propRow('Total uploaded', formatOpBytes(t.upTotal)),
             propRow('Download dir', t.downloadDir),
+            // TODO: more fields
           ],
         ),
       ),

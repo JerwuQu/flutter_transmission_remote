@@ -95,7 +95,7 @@ class TransmissionConnection {
     if (res['result'] == 'success') {
       return res['arguments'];
     } else {
-      throw TransmissionException('Transmission rejected API request');
+      throw TransmissionException('Transmission rejected API request: ${resp.body}');
     }
   }
 
