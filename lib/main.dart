@@ -486,7 +486,10 @@ class ConnectionPageState extends State<ConnectionPage> {
     final ts = await loadTask(connection.getTorrents());
     setState(() {
       torrents = ts ?? [];
-      // TODO: re-sort according to current sorting
+      if (_sortColumnIndex != null) {
+        // Re-sort according to current sorting
+        _sort(_sortComparer!, _sortColumnIndex!, _sortAscending);
+      }
     });
   }
 
@@ -638,19 +641,18 @@ class ConnectionPageState extends State<ConnectionPage> {
 
   int? _sortColumnIndex;
   bool _sortAscending = true;
-  void _sort<T extends Comparable<T>>(
-    T Function(Torrent) getField,
-    int columnIndex,
-    bool ascending,
-  ) {
+  int Function(Torrent, Torrent)? _sortComparer;
+
+  void _sort(int Function(Torrent, Torrent) comparer, int columnIndex, bool ascending) {
     setState(() {
       if (ascending) {
-        mergeSort(torrents, compare: (Torrent a, Torrent b) => getField(a).compareTo(getField(b)));
+        mergeSort(torrents, compare: comparer);
       } else {
-        mergeSort(torrents, compare: (Torrent a, Torrent b) => getField(b).compareTo(getField(a)));
+        mergeSort(torrents, compare: (Torrent a, Torrent b) => comparer(b, a));
       }
       _sortColumnIndex = columnIndex;
       _sortAscending = ascending;
+      _sortComparer = comparer;
     });
   }
 
@@ -689,30 +691,50 @@ class ConnectionPageState extends State<ConnectionPage> {
                 DataColumn2(
                   label: const Text('Name'),
                   size: ColumnSize.L,
-                  onSort: (col, asc) => _sort((t) => t.name, col, asc),
+                  onSort: (col, asc) => _sort(
+                    (a, b) => a.name.compareTo(b.name),
+                    col,
+                    asc,
+                  ),
                 ),
                 DataColumn2(
                   label: const Text('Date added'),
                   size: ColumnSize.S,
-                  onSort: (col, asc) => _sort<num>((t) => t.addedDate, col, asc),
+                  onSort: (col, asc) => _sort(
+                    (a, b) => a.addedDate.compareTo(b.addedDate),
+                    col,
+                    asc,
+                  ),
                 ),
                 DataColumn2(
                   label: const Text('Size'),
                   size: ColumnSize.S,
                   numeric: true,
-                  onSort: (col, asc) => _sort<num>((t) => t.size ?? 0, col, asc),
+                  onSort: (col, asc) => _sort(
+                    (a, b) => (a.size ?? 0).compareTo(b.size ?? 0),
+                    col,
+                    asc,
+                  ),
                 ),
                 DataColumn2(
                   label: const Text('Up'),
                   size: ColumnSize.S,
                   numeric: true,
-                  onSort: (col, asc) => _sort<num>((t) => t.upSpeed ?? 0, col, asc),
+                  onSort: (col, asc) => _sort(
+                    (a, b) => (a.upSpeed ?? 0).compareTo(b.upSpeed ?? 0),
+                    col,
+                    asc,
+                  ),
                 ),
                 DataColumn2(
                   label: const Text('Down'),
                   size: ColumnSize.S,
                   numeric: true,
-                  onSort: (col, asc) => _sort<num>((t) => t.downSpeed ?? 0, col, asc),
+                  onSort: (col, asc) => _sort(
+                    (a, b) => (a.downSpeed ?? 0).compareTo(b.downSpeed ?? 0),
+                    col,
+                    asc,
+                  ),
                 ),
               ],
               rows: [
