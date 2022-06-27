@@ -445,12 +445,17 @@ class ConnectionPage extends StatefulWidget {
 
 class ConnectionPageState extends State<ConnectionPage> {
   Offset tapPos = Offset.zero;
-
   late TransmissionConnection connection;
-  List<Torrent> torrents = [];
+  AdjustableScrollController scrollController = AdjustableScrollController(100);
   Future<void> loading = Future.value();
 
-  AdjustableScrollController scrollController = AdjustableScrollController(100);
+  List<Torrent> allTorrents = [];
+
+  TextEditingController searchController = TextEditingController();
+  int? sortColumnIndex;
+  bool sortAscending = true;
+  int Function(Torrent, Torrent)? sortComparer;
+  List<Torrent> filteredStortedTorrents = [];
 
   @override
   void initState() {
@@ -485,11 +490,8 @@ class ConnectionPageState extends State<ConnectionPage> {
   Future refreshTorrents() async {
     final ts = await loadTask(connection.getTorrents());
     setState(() {
-      torrents = ts ?? [];
-      if (_sortColumnIndex != null) {
-        // Re-sort according to current sorting
-        _sort(_sortComparer!, _sortColumnIndex!, _sortAscending);
-      }
+      allTorrents = ts ?? [];
+      filterSortTorrents();
     });
   }
 
@@ -593,7 +595,7 @@ class ConnectionPageState extends State<ConnectionPage> {
       context: context,
       builder: (BuildContext context) {
         return AddTorrentDialog(
-          torrents,
+          allTorrents,
           onAddFromFile: (data, dir) {
             apiLoadRefresh(connection.addTorrentFromFile(data, dir));
           },
@@ -616,7 +618,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             child: Row(
               children: [
                 Expanded(
-                  child: DownloadDirPicker(torrents, initialDir: dir, onChanged: (d) => dir = d),
+                  child: DownloadDirPicker(allTorrents, initialDir: dir, onChanged: (d) => dir = d),
                 ),
                 TextButton(
                   onPressed: () {
@@ -639,21 +641,34 @@ class ConnectionPageState extends State<ConnectionPage> {
     );
   }
 
-  int? _sortColumnIndex;
-  bool _sortAscending = true;
-  int Function(Torrent, Torrent)? _sortComparer;
+  void filterSortTorrents() {
+    setState(() {
+      filteredStortedTorrents = searchController.text.isEmpty
+          ? allTorrents
+          : allTorrents
+              .where((t) => t.name.toLowerCase().contains(searchController.text.toLowerCase()))
+              .toList();
+      if (sortComparer != null) {
+        if (sortAscending) {
+          mergeSort(
+            filteredStortedTorrents,
+            compare: sortComparer!,
+          );
+        } else {
+          mergeSort(
+            filteredStortedTorrents,
+            compare: (Torrent a, Torrent b) => sortComparer!(b, a),
+          );
+        }
+      }
+    });
+  }
 
   void _sort(int Function(Torrent, Torrent) comparer, int columnIndex, bool ascending) {
-    setState(() {
-      if (ascending) {
-        mergeSort(torrents, compare: comparer);
-      } else {
-        mergeSort(torrents, compare: (Torrent a, Torrent b) => comparer(b, a));
-      }
-      _sortColumnIndex = columnIndex;
-      _sortAscending = ascending;
-      _sortComparer = comparer;
-    });
+    sortColumnIndex = columnIndex;
+    sortAscending = ascending;
+    sortComparer = comparer;
+    filterSortTorrents();
   }
 
   @override
@@ -669,13 +684,38 @@ class ConnectionPageState extends State<ConnectionPage> {
         }
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Torrents'),
+            title: Row(
+              children: [
+                const Expanded(flex: 0, child: Text('Torrents')),
+                const SizedBox(width: 32),
+                Expanded(
+                  flex: 1,
+                  child: TextFormField(
+                    controller: searchController,
+                    decoration: InputDecoration(
+                      fillColor: Colors.white,
+                      filled: true,
+                      labelText: 'Search',
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          searchController.clear();
+                          filterSortTorrents();
+                        },
+                        icon: const Icon(Icons.clear),
+                      ),
+                    ),
+                    onEditingComplete: () => filterSortTorrents(),
+                    onSaved: (_) => filterSortTorrents(),
+                  ),
+                ),
+                const SizedBox(width: 32),
+              ],
+            ),
             actions: [
-              // TODO: search
               IconButton(
                 icon: const Icon(Icons.refresh),
                 onPressed: () => refreshTorrents(),
-              )
+              ),
             ],
           ),
           body: Listener(
@@ -685,8 +725,8 @@ class ConnectionPageState extends State<ConnectionPage> {
               smRatio: 0.4,
               columnSpacing: 5,
               scrollController: scrollController,
-              sortAscending: _sortAscending,
-              sortColumnIndex: _sortColumnIndex,
+              sortAscending: sortAscending,
+              sortColumnIndex: sortColumnIndex,
               columns: [
                 DataColumn2(
                   label: const Text('Name'),
@@ -738,7 +778,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                 ),
               ],
               rows: [
-                for (final t in torrents)
+                for (final t in filteredStortedTorrents)
                   DataRow2(
                     cells: [
                       DataCell(Row(children: [
