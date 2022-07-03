@@ -260,6 +260,7 @@ class DownloadDirPickerState extends State<DownloadDirPicker> {
     super.initState();
     downloadDirController.text =
         widget.initialDir ?? widget.torrents.firstOrNull?.downloadDir ?? '';
+    widget.onChanged(downloadDirController.text);
   }
 
   @override
