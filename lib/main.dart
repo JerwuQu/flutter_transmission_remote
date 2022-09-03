@@ -724,7 +724,7 @@ class ConnectionPageState extends State<ConnectionPage> {
             child: DataTable2(
               lmRatio: 2,
               smRatio: 0.4,
-              columnSpacing: 5,
+              columnSpacing: 20,
               scrollController: scrollController,
               sortAscending: sortAscending,
               sortColumnIndex: sortColumnIndex,
@@ -777,6 +777,16 @@ class ConnectionPageState extends State<ConnectionPage> {
                     asc,
                   ),
                 ),
+                DataColumn2(
+                  label: const Text('Tracker'),
+                  size: ColumnSize.M,
+                  onSort: (col, asc) => _sort(
+                    (a, b) => (a.trackers.firstOrNull?.announce ?? '')
+                        .compareTo(b.trackers.firstOrNull?.announce ?? ''),
+                    col,
+                    asc,
+                  ),
+                ),
               ],
               rows: [
                 for (final t in filteredStortedTorrents)
@@ -796,6 +806,8 @@ class ConnectionPageState extends State<ConnectionPage> {
                       )),
                       DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
                       DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
+                      DataCell(
+                          Text(Uri.tryParse(t.trackers.firstOrNull?.announce ?? '')?.host ?? '')),
                     ],
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (ctx) => TorrentPage(t)));
@@ -855,6 +867,7 @@ class TorrentPage extends StatelessWidget {
             propRow('Total downloaded', formatOpBytes(t.downTotal)),
             propRow('Total uploaded', formatOpBytes(t.upTotal)),
             propRow('Download dir', t.downloadDir),
+            propRow('Trackers', t.trackers.map((e) => e.announce).join('\n')),
             // TODO: more fields
           ],
         ),

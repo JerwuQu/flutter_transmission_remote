@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
+// https://github.com/transmission/transmission/blob/main/docs/rpc-spec.md
+
 enum TorrentStatus {
   stopped,
   queuedToCheck,
@@ -23,11 +25,25 @@ class TransmissionException implements Exception {
   TransmissionException(this.message);
 }
 
+class Tracker {
+  int id, tier;
+  String announce, scrape;
+  String? sitename;
+
+  Tracker.fromJson(dynamic json)
+      : id = json['id'],
+        tier = json['tier'],
+        announce = json['announce'],
+        scrape = json['scrape'],
+        sitename = json['sitename'];
+}
+
 class Torrent {
   int id, addedDate;
   TorrentStatus status;
   String name, downloadDir, errorString;
   int? size, bytesLeft, seeds, leeches, downSpeed, upSpeed, downTotal, upTotal;
+  List<Tracker> trackers;
   Torrent.fromJson(dynamic json)
       : addedDate = json['addedDate'],
         bytesLeft = json['leftUntilDone'],
@@ -42,7 +58,9 @@ class Torrent {
         status = TorrentStatus.values[json['status']],
         upSpeed = json['rateUpload'],
         upTotal = json['uploadedEver'],
-        id = json['id'];
+        id = json['id'],
+        trackers =
+            (json['trackers'] as List<dynamic>).map<Tracker>((tj) => Tracker.fromJson(tj)).toList();
 }
 
 class TransmissionConnection {
@@ -120,6 +138,7 @@ class TransmissionConnection {
           'sizeWhenDone',
           'status',
           'uploadedEver',
+          'trackers',
         ]
       },
     });
