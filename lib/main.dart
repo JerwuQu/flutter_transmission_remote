@@ -803,7 +803,8 @@ class ConnectionPageState extends State<ConnectionPage> {
                   label: const Text('Tracker'),
                   size: ColumnSize.M,
                   onSort: (col, asc) => _sort(
-                    (a, b) => (a.firstTrackerHost ?? '').compareTo(b.firstTrackerHost ?? ''),
+                    (a, b) => (a.trackers.firstOrNull?.hostname ?? '')
+                        .compareTo(b.trackers.firstOrNull?.hostname ?? ''),
                     col,
                     asc,
                   ),
@@ -828,7 +829,8 @@ class ConnectionPageState extends State<ConnectionPage> {
                       DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
                       DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
                       DataCell(Text(t.downloadDir.substring(commonDirPrefix.length))),
-                      DataCell(Text(t.firstTrackerHost ?? '')),
+                      DataCell(Text((t.trackers.firstOrNull?.hostname ?? '') +
+                          (t.trackers.length > 1 ? ' (+${t.trackers.length - 1})' : ''))),
                     ],
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (ctx) => TorrentPage(t)));
