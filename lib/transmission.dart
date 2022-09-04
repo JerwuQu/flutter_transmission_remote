@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:collection/collection.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/http.dart';
 
@@ -44,6 +45,7 @@ class Torrent {
   String name, downloadDir, errorString;
   int? size, bytesLeft, seeds, leeches, downSpeed, upSpeed, downTotal, upTotal;
   List<Tracker> trackers;
+  String? firstTrackerHost;
   Torrent.fromJson(dynamic json)
       : addedDate = json['addedDate'],
         bytesLeft = json['leftUntilDone'],
@@ -59,8 +61,11 @@ class Torrent {
         upSpeed = json['rateUpload'],
         upTotal = json['uploadedEver'],
         id = json['id'],
-        trackers =
-            (json['trackers'] as List<dynamic>).map<Tracker>((tj) => Tracker.fromJson(tj)).toList();
+        trackers = (json['trackers'] as List<dynamic>)
+            .map<Tracker>((tj) => Tracker.fromJson(tj))
+            .toList() {
+    firstTrackerHost = Uri.tryParse(trackers.firstOrNull?.announce ?? '')?.host;
+  }
 }
 
 class TransmissionConnection {

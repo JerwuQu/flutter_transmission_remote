@@ -683,6 +683,19 @@ class ConnectionPageState extends State<ConnectionPage> {
             body: const Center(child: CircularProgressIndicator()),
           );
         }
+
+        // Get common prefix between all directories
+        final dirs = filteredStortedTorrents.map((t) => t.downloadDir);
+        var commonDirPrefix = dirs.firstOrNull ?? '';
+        for (final dir in dirs) {
+          for (var i = 0; i < commonDirPrefix.length; i++) {
+            if (dir[i] != commonDirPrefix[i]) {
+              commonDirPrefix = commonDirPrefix.substring(0, i);
+              break;
+            }
+          }
+        }
+
         return Scaffold(
           appBar: AppBar(
             title: Row(
@@ -778,11 +791,19 @@ class ConnectionPageState extends State<ConnectionPage> {
                   ),
                 ),
                 DataColumn2(
+                  label: const Text('Dir'),
+                  size: ColumnSize.M,
+                  onSort: (col, asc) => _sort(
+                    (a, b) => a.downloadDir.compareTo(b.downloadDir),
+                    col,
+                    asc,
+                  ),
+                ),
+                DataColumn2(
                   label: const Text('Tracker'),
                   size: ColumnSize.M,
                   onSort: (col, asc) => _sort(
-                    (a, b) => (a.trackers.firstOrNull?.announce ?? '')
-                        .compareTo(b.trackers.firstOrNull?.announce ?? ''),
+                    (a, b) => (a.firstTrackerHost ?? '').compareTo(b.firstTrackerHost ?? ''),
                     col,
                     asc,
                   ),
@@ -806,8 +827,8 @@ class ConnectionPageState extends State<ConnectionPage> {
                       )),
                       DataCell(Text('${formatOpBytes(t.upSpeed)}/s', textAlign: TextAlign.right)),
                       DataCell(Text('${formatOpBytes(t.downSpeed)}/s', textAlign: TextAlign.right)),
-                      DataCell(
-                          Text(Uri.tryParse(t.trackers.firstOrNull?.announce ?? '')?.host ?? '')),
+                      DataCell(Text(t.downloadDir.substring(commonDirPrefix.length))),
+                      DataCell(Text(t.firstTrackerHost ?? '')),
                     ],
                     onTap: () {
                       Navigator.push(context, MaterialPageRoute(builder: (ctx) => TorrentPage(t)));
