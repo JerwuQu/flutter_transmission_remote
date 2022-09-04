@@ -139,12 +139,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
                           TextButton(
-                            style: TextButton.styleFrom(
-                              primary: Theme.of(context).colorScheme.primary,
-                              backgroundColor: Theme.of(context).colorScheme.surface,
-                              elevation: 3,
-                              padding: const EdgeInsets.all(8),
-                            ),
+                            style: elevatedButtonStyle(context),
                             onPressed: () {
                               setState(() {
                                 if (index == null) {
@@ -164,12 +159,7 @@ class ConnectionListPageState extends State<ConnectionListPage> {
                             : [
                                 const SizedBox(width: 40),
                                 TextButton(
-                                  style: TextButton.styleFrom(
-                                    primary: Colors.red,
-                                    backgroundColor: Theme.of(context).colorScheme.surface,
-                                    elevation: 3,
-                                    padding: const EdgeInsets.all(8),
-                                  ),
+                                  style: elevatedButtonStyle(context, color: Colors.red),
                                   onPressed: () async {
                                     if (await confirm(context)) {
                                       setState(() {
@@ -356,12 +346,7 @@ class AddTorrentDialogState extends State<AddTorrentDialog> {
                   (preferTorrentFile
                       ? [
                           TextButton(
-                            style: TextButton.styleFrom(
-                              primary: Theme.of(context).colorScheme.primary,
-                              backgroundColor: Theme.of(context).colorScheme.surface,
-                              elevation: 3,
-                              padding: const EdgeInsets.all(8),
-                            ),
+                            style: elevatedButtonStyle(context),
                             onPressed: () async {
                               FilePickerResult? result = await FilePicker.platform.pickFiles(
                                 type: FileType.custom,
@@ -408,12 +393,7 @@ class AddTorrentDialogState extends State<AddTorrentDialog> {
             ),
             const SizedBox(height: 10),
             TextButton(
-              style: TextButton.styleFrom(
-                primary: Theme.of(context).colorScheme.primary,
-                backgroundColor: Theme.of(context).colorScheme.surface,
-                elevation: 3,
-                padding: const EdgeInsets.all(8),
-              ),
+              style: elevatedButtonStyle(context),
               onPressed: () async {
                 if (preferTorrentFile) {
                   if (torrentFileData == null) {
@@ -626,12 +606,7 @@ class ConnectionPageState extends State<ConnectionPage> {
                     Navigator.of(context).pop();
                     apiLoadRefresh(connection.moveTorrent(t.id, dir));
                   },
-                  style: TextButton.styleFrom(
-                    primary: Theme.of(context).colorScheme.primary,
-                    backgroundColor: Theme.of(context).colorScheme.surface,
-                    elevation: 3,
-                    padding: const EdgeInsets.all(8),
-                  ),
+                  style: elevatedButtonStyle(context),
                   child: const Text('Move'),
                 ),
               ],
